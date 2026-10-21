@@ -4,7 +4,7 @@ export const DEFAULT_BRANDING = Object.freeze({
   productTagline: "A clearer way to run your business.",
   logoUrl: null as string | null,
   faviconUrl: null as string | null,
-  primaryColor: "#2563eb",
+  primaryColor: "#2563EB",
   supportEmail: null as string | null,
   supportWebsite: null as string | null,
   footerText: "© {year} {product_name}. All rights reserved.",

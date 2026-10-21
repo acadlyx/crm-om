@@ -22,7 +22,7 @@ model User {
   tenantId     String?  @map("tenant_id") @db.Uuid
   tenant       Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([tenantId, role])
   @@map("users")
@@ -34,7 +34,7 @@ model Tenant {
   users     User[]
   settings  BusinessSettings?
   createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("tenants")
 }
@@ -46,29 +46,29 @@ model PlatformSettings {
   productTagline String   @default("A clearer way to run your business.") @map("product_tagline") @db.VarChar(240)
   logoUrl        String?  @map("logo_url") @db.VarChar(2048)
   faviconUrl     String?  @map("favicon_url") @db.VarChar(2048)
-  primaryColor   String   @default("#2563eb") @map("primary_color") @db.VarChar(7)
+  primaryColor   String   @default("#2563EB") @map("primary_color") @db.VarChar(7)
   supportEmail   String?  @map("support_email") @db.VarChar(320)
   supportWebsite String?  @map("support_website") @db.VarChar(2048)
   footerText     String   @default("© {year} {product_name}. All rights reserved.") @map("footer_text") @db.VarChar(500)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("platform_settings")
 }
 
 /// Independent tenant business identity used for invoices and tenant communications.
 model BusinessSettings {
-  id             String   @id @default(uuid()) @db.Uuid
-  tenantId       String   @unique @map("tenant_id") @db.Uuid
-  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  businessName   String   @map("business_name") @db.VarChar(160)
-  logoUrl        String?  @map("logo_url") @db.VarChar(2048)
-  contactEmail   String?  @map("contact_email") @db.VarChar(320)
-  contactPhone   String?  @map("contact_phone") @db.VarChar(40)
-  address        String?  @db.VarChar(1000)
-  invoicePrefix  String   @default("INV") @map("invoice_prefix") @db.VarChar(20)
-  invoiceIdentity Json    @default("{}") @map("invoice_identity")
-  preferences    Json     @default("{}")
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @unique @map("tenant_id") @db.Uuid
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  businessName    String   @map("business_name") @db.VarChar(160)
+  logoUrl         String?  @map("logo_url") @db.VarChar(2048)
+  contactEmail    String?  @map("contact_email") @db.VarChar(320)
+  contactPhone    String?  @map("contact_phone") @db.VarChar(40)
+  address         String?  @db.VarChar(1000)
+  invoicePrefix   String   @default("INV") @map("invoice_prefix") @db.VarChar(20)
+  invoiceIdentity Json     @default("{}") @map("invoice_identity")
+  preferences     Json     @default("{}")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("business_settings")
 }
