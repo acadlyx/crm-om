@@ -8,6 +8,8 @@ const patterns = [
   /Business CRM/gi,
   /Powered by Business CRM/gi,
   /A clearer (?:view|way) to run your business/gi,
+  /--brand-primary\s*:\s*#[0-9a-f]{6}/gi,
+  /CRM-OM/gi,
 ];
 const allowedLiteralPath = (file) => file === "lib/branding/defaults.ts" || file.startsWith("prisma/migrations/");
 
@@ -29,8 +31,12 @@ for (const file of files) {
   const content = await readFile(path.join(root, file), "utf8");
   for (const pattern of patterns) {
     pattern.lastIndex = 0;
-    if (pattern.test(content)) violations.push(file + ": product name/tagline/footer literal must come from centralized branding");
+    if (pattern.test(content)) violations.push(file + ": product label, attribution, or primary-color literal must come from centralized branding");
   }
+}
+const layout = await readFile(path.join(root, "app/layout.tsx"), "utf8").catch(() => "");
+if (!layout.includes("getPlatformBranding") || !layout.includes("generateMetadata")) {
+  violations.push("app/layout.tsx: metadata must be derived from the centralized platform branding service");
 }
 if (violations.length) {
   console.error("Dynamic product-branding audit failed:");
