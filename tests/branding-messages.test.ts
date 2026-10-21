@@ -23,13 +23,15 @@ describe("system-message branding", () => {
     expect(email.html).not.toContain("<script>");
     expect(email.text).toContain("help@example.test");
   });
-  it("drops non-http notification links and uses the configured source label", async () => {
+  it("drops unsafe notification links but preserves safe internal application paths", async () => {
     mocks.getPlatformBranding.mockResolvedValue({
       productName:"Changed Product",productTagline:"",logoUrl:null,faviconUrl:null,
       primaryColor:"#123456",supportEmail:null,supportWebsite:null,footerText:"{product_name}",updatedAt:"2026-10-22T00:00:00.000Z",
     });
-    const value=await buildSystemNotification({title:"Alert",body:"Something changed",href:"javascript:alert(1)"});
-    expect(value.sourceLabel).toBe("Changed Product");
-    expect(value.href).toBeNull();
+    const unsafe=await buildSystemNotification({title:"Alert",body:"Something changed",href:"javascript:alert(1)"});
+    const internal=await buildSystemNotification({title:"Alert",body:"Something changed",href:"/notifications"});
+    expect(unsafe.href).toBeNull();
+    expect(internal.href).toBe("/notifications");
+    expect(internal.sourceLabel).toBe("Changed Product");
   });
 });

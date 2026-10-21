@@ -11,6 +11,12 @@ function safeHttpUrl(value: string | null | undefined): string | null {
     return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
   } catch { return null; }
 }
+function safeNotificationHref(value: string | undefined): string | null {
+  if (!value) return null;
+  // Keep ordinary app-relative paths on this origin; reject protocol-relative/backslash URLs.
+  if (value.startsWith("/") && !value.startsWith("//") && !value.includes("\\") && !/[\u0000-\u001f]/.test(value)) return value;
+  return safeHttpUrl(value);
+}
 
 export type SystemMessage = {
   subject: string;
@@ -54,7 +60,7 @@ export async function buildSystemNotification(input: { title: string; body: stri
   return {
     title: input.title,
     body: input.body,
-    href: safeHttpUrl(input.href),
+    href: safeNotificationHref(input.href),
     sourceLabel: brand.productName,
     supportEmail: brand.supportEmail,
   };
