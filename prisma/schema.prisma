@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client"
+  output = "../generated/prisma"
+}
+datasource db { provider = "postgresql" }
+
+enum UserRole { PLATFORM_ADMIN TENANT_ADMIN STAFF }
+
+model User {
+  id String @id @default(uuid()) @db.Uuid
+  name String @db.VarChar(160)
+  email String @unique @db.VarChar(320)
+  passwordHash String @map("password_hash")
+  role UserRole @default(STAFF)
+  tenantId String? @map("tenant_id") @db.Uuid
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  @@index([tenantId, role])
+  @@map("users")
+}
+
+model Tenant {
+  id String @id @default(uuid()) @db.Uuid
+  slug String @unique @db.VarChar(80)
+  users User[]
+  settings BusinessSettings?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  @@map("tenants")
+}
+
+/// Global platform product brand. Do not put tenant identity fields in this model.
+model PlatformSettings {
+  id String @id @default("global") @db.VarChar(32)
+  productName String @default("Business CRM") @map("product_name") @db.VarChar(120)
+  productTagline String @default("A clearer view of your business") @map("product_tagline") @db.VarChar(240)
+  logoUrl String? @map("logo_url") @db.VarChar(2048)
+  faviconUrl String? @map("favicon_url") @db.VarChar(2048)
+  primaryColor String @default("#2563EB") @map("primary_color") @db.VarChar(7)
+  supportEmail String? @map("support_email") @db.VarChar(320)
+  supportWebsite String? @map("support_website") @db.VarChar(2048)
+  footerText String @default("Powered by Business CRM") @map("footer_text") @db.VarChar(500)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  @@map("platform_settings")
+}
+
+/// Tenant identity for invoices and customer-facing business content, separate from product branding.
+model BusinessSettings {
+  id String @id @default(uuid()) @db.Uuid
+  tenantId String @unique @map("tenant_id") @db.Uuid
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  businessName String @map("business_name") @db.VarChar(160)
+  logoUrl String? @map("logo_url") @db.VarChar(2048)
+  contactEmail String? @map("contact_email") @db.VarChar(320)
+  contactPhone String? @map("contact_phone") @db.VarChar(40)
+  address String? @db.VarChar(1000)
+  invoicePrefix String @default("INV") @map("invoice_prefix") @db.VarChar(20)
+  invoiceIdentity Json @default("{}") @map("invoice_identity")
+  preferences Json @default("{}")
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  @@map("business_settings")
+}
+
+model AuditLog {
+  id String @id @default(uuid()) @db.Uuid
+  actorUserId String? @map("actor_user_id") @db.Uuid
+  action String @db.VarChar(120)
+  entityType String @map("entity_type") @db.VarChar(120)
+  entityId String? @map("entity_id") @db.VarChar(120)
+  metadata Json @default("{}")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  @@index([entityType, entityId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@map("audit_logs")
+}
