@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client";
+import { DEFAULT_BRANDING } from "../lib/branding/defaults";
 
 const url = process.env.TEST_DATABASE_URL;
 const safeUrl = (() => {
@@ -23,7 +24,17 @@ describe("platform branding PostgreSQL persistence", () => {
     const name = "Branding integration " + Date.now();
     await client.platformSettings.upsert({
       where: { id: "global" },
-      create: { id: "global", productName: name },
+      create: {
+        id: "global",
+        productName: name,
+        productTagline: DEFAULT_BRANDING.productTagline,
+        logoUrl: DEFAULT_BRANDING.logoUrl,
+        faviconUrl: DEFAULT_BRANDING.faviconUrl,
+        primaryColor: DEFAULT_BRANDING.primaryColor,
+        supportEmail: DEFAULT_BRANDING.supportEmail,
+        supportWebsite: DEFAULT_BRANDING.supportWebsite,
+        footerText: DEFAULT_BRANDING.footerText,
+      },
       update: { productName: name },
     });
     const freshRead = await client.platformSettings.findUnique({ where: { id: "global" } });
