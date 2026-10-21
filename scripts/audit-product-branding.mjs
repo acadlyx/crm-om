@@ -53,7 +53,7 @@ for (const file of tracked) {
 }
 
 const structuralRequirements = [
-  ["app/layout.tsx", ["getPlatformBranding", "generateMetadata", "brand.productName"]],
+  ["app/layout.tsx", ["getPlatformBranding", "generateMetadata", "branding.productName"]],
   ["components/brand-logo.tsx", ["branding.productName", "branding.logoUrl"]],
   ["components/app-sidebar.tsx", ["BrandLogo"]],
   ["app/login/page.tsx", ["getPlatformBranding", "BrandLogo"]],
