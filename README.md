@@ -1,23 +1,21 @@
 # CRM-OM
 
-Multi-tenant CRM foundation with database-backed, request-time product branding.
+Multi-tenant CRM foundation with centralized, database-backed product branding.
 
-## Setup
-1. Copy .env.example to .env and configure PostgreSQL, session secrets and S3-compatible storage.
-2. Run npm install.
-3. Run npm run db:generate and npm run db:migrate.
-4. Set PLATFORM_ADMIN_EMAIL and a PLATFORM_ADMIN_PASSWORD of at least 12 characters, then run npm run db:seed.
-5. Run npm run dev.
+## Local setup
+1. Use Node.js 20+ and PostgreSQL.
+2. Copy .env.example to .env and set DATABASE_URL, NEXTAUTH_URL and a random NEXTAUTH_SECRET.
+3. For first-time local setup, set PLATFORM_ADMIN_EMAIL and PLATFORM_ADMIN_PASSWORD (at least 12 characters).
+4. Install dependencies with npm install.
+5. Apply schema with npm run db:migrate, generate Prisma Client with npm run db:generate, then run npm run db:seed.
+6. Start with npm run dev.
 
-The final product name is intentionally undecided. A neutral temporary fallback, Business CRM, is configured centrally. Update it at Platform Settings -> Branding after signing in as a platform administrator.
+## Product branding
+The temporary product name is configured centrally in lib/branding/defaults.ts and the initial DB migration. The Platform Settings -> Branding page can change product name, tagline, logo, favicon, primary color, support details and footer. The next request/navigation reads current database settings; no deployment is needed for a branding change. Logo and favicon upload requires S3-compatible storage values from .env.example.
 
-## Design notes
-- platform_settings is a global singleton, separate from tenant business_settings.
-- Platform branding is loaded server-side on dynamic requests; GET responses are no-store, and updates invalidate relevant routes.
-- Only PLATFORM_ADMIN may update global brand settings or upload global brand assets.
-- Tenant business settings use the authenticated user's tenant ID. API input cannot select an arbitrary tenant.
-- Logo and favicon assets require configured S3-compatible storage; image bytes, type and size are validated.
-- Shared email and notification modules should call the centralized branding message helper; the empty base repository has no pre-existing dispatch provider to wire directly.
+Global platform branding and tenant business identity are separate records and APIs. Tenant settings are scoped from the authenticated tenant-administrator session.
 
-## Verification
-Run npm run typecheck, npm test, npm run lint, and npm run build. Database persistence and browser propagation need a configured PostgreSQL environment and must not be reported as verified until actually tested.
+System email/notification template helpers live in lib/branding/messages.ts. This empty starter repository does not include a configured delivery provider; wire the helpers into a chosen provider when delivery is implemented.
+
+## Validation
+Run npm run db:generate, npm run typecheck, npm run lint, npm test and npm run build. For the optional PostgreSQL integration test, set TEST_DATABASE_URL to a dedicated test database with this migration applied. Do not report persistence, object-storage uploads or browser no-redeployment behavior as verified until tested in the configured environment.
