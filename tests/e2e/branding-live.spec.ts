@@ -30,8 +30,9 @@ test("branding update persists and appears on a fresh request without restarting
   const persistedResponse = await request.get(apiUrl);
   expect((await persistedResponse.json()).data.productName).toBe(changedName);
 
+  // browserContext.request shares the authenticated browser cookies with the page.
   const { updatedAt: _updatedAt, ...originalConfig } = initial;
-  const restore = await page.request.fetch(apiUrl, {
+  const restore = await page.context().request.fetch(apiUrl, {
     method: "PATCH",
     headers: { origin: baseURL, "content-type": "application/json" },
     data: originalConfig,
