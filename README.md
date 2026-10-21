@@ -18,7 +18,7 @@ Tenant-owned business identity lives in business_settings and is managed through
 ## Delivery integration
 - System email: lib/messaging/resend.ts calls the Resend email API and renders the configured database branding at send time. Set RESEND_API_KEY and RESEND_FROM_EMAIL to a sender address verified by your Resend account.
 - Use lib/messaging/delivery.ts from server-side business events to create a durable branded in-app notification and optionally send email in the same workflow.
-- In-app notifications are persisted in system_notifications and displayed in /notifications. GET /api/v1/notifications returns only the signed-in user's notifications; PATCH /api/v1/notifications/:id marks only that user's notification read.
+- In-app notifications are persisted in system_notifications and displayed in /notifications. The page fetches the current product name at request time; notifications and mark-as-read actions are scoped to the authenticated recipient.
 - Provider acceptance is not proof of inbox delivery. Delivery requires valid Resend credentials and a verified sender/domain.
 - This repository began empty and contains no pre-existing business email or notification dispatch workflows. The delivery service is the integration point for future workflows; it does not fake external delivery.
 
