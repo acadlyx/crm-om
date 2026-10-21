@@ -1,21 +1,25 @@
 # CRM-OM
 
-Multi-tenant CRM foundation with centralized, database-backed product branding.
+Multi-tenant CRM foundation with centralized database-backed product branding, tenant-specific business identity, durable in-app notifications and an optional Resend email delivery adapter.
 
 ## Local setup
-1. Use Node.js 20+ and PostgreSQL.
-2. Copy .env.example to .env and set DATABASE_URL, NEXTAUTH_URL and a random NEXTAUTH_SECRET.
-3. For first-time local setup, set PLATFORM_ADMIN_EMAIL and PLATFORM_ADMIN_PASSWORD (at least 12 characters).
-4. Install dependencies with npm install.
-5. Apply schema with npm run db:migrate, generate Prisma Client with npm run db:generate, then run npm run db:seed.
-6. Start with npm run dev.
+1. Use Node.js 22 and PostgreSQL 16+.
+2. Copy .env.example to .env and set DATABASE_URL, NEXTAUTH_URL, NEXTAUTH_SECRET and PLATFORM_ADMIN_EMAIL/PLATFORM_ADMIN_PASSWORD.
+3. Run npm install.
+4. Apply migrations and generate the client with: npm run db:migrate && npm run db:generate.
+5. Seed the local platform administrator with npm run db:seed.
+6. Run npm run dev.
 
 ## Product branding
-The temporary product name is configured centrally in lib/branding/defaults.ts and the initial DB migration. The Platform Settings -> Branding page can change product name, tagline, logo, favicon, primary color, support details and footer. The next request/navigation reads current database settings; no deployment is needed for a branding change. Logo and favicon upload requires S3-compatible storage values from .env.example.
+The temporary product name and other fallbacks are defined in lib/branding/defaults.ts. The Platform Settings -> Branding screen updates the singleton platform_settings row. Requests read that row dynamically, API responses are no-store, and settings writes invalidate the root layout. There is no build-time branding cache; fresh requests/navigation reflect updates without deploying a new build. Logo and favicon URLs are versioned to reduce stale browser/CDN assets.
 
-Global platform branding and tenant business identity are separate records and APIs. Tenant settings are scoped from the authenticated tenant-administrator session.
+Tenant-owned business identity lives in business_settings and is managed through a separate session-scoped API. Tenant administrators cannot update global platform branding or select another tenant by sending an ID.
 
-System email/notification template helpers live in lib/branding/messages.ts. This empty starter repository does not include a configured delivery provider; wire the helpers into a chosen provider when delivery is implemented.
+## Delivery integration
+- System email: lib/messaging/resend.ts calls the Resend email API and renders the configured database branding at send time. Set RESEND_API_KEY and RESEND_FROM_EMAIL to a sender address verified by your Resend account.
+- In-app notifications: lib/notifications/service.ts persists branded notifications in system_notifications with recipient scoping and optional idempotency keys. GET /api/v1/notifications returns only the signed-in user's notifications; PATCH /api/v1/notifications/:id marks only that user's notification read.
+- Provider acceptance is not proof of inbox delivery. Delivery requires valid Resend credentials and a verified sender/domain.
+- The repository began empty and contains no pre-existing business email or notification dispatch workflows. Use sendSystemEmail and createSystemNotification as server-side entry points when adding those workflows; no fake external delivery is claimed.
 
-## Validation
-Run npm run db:generate, npm run typecheck, npm run lint, npm test and npm run build. For the optional PostgreSQL integration test, set TEST_DATABASE_URL to a dedicated test database with this migration applied. Do not report persistence, object-storage uploads or browser no-redeployment behavior as verified until tested in the configured environment.
+## Verification
+Run npm run db:migrate, npm run db:seed, npm run typecheck, npm run lint, npm run audit:branding, npm test, npm run build, and npm run test:e2e. Branding CI provisions PostgreSQL and includes a real browser test that updates the brand and verifies the fresh title and database state while the same server remains running.

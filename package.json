@@ -10,7 +10,9 @@
     "lint": "eslint .",
     "typecheck": "prisma generate && tsc --noEmit",
     "test": "prisma generate && vitest run",
+    "test:e2e": "playwright test",
     "test:watch": "vitest",
+    "audit:branding": "node scripts/audit-product-branding.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:dev": "prisma migrate dev",
@@ -32,6 +34,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.18.12",
     "@types/pg": "^8.15.5",

@@ -2,7 +2,6 @@ generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
 }
-
 datasource db {
   provider = "postgresql"
 }
@@ -14,15 +13,16 @@ enum UserRole {
 }
 
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  name         String   @db.VarChar(160)
-  email        String   @unique @db.VarChar(320)
-  passwordHash String   @map("password_hash")
-  role         UserRole @default(STAFF)
-  tenantId     String?  @map("tenant_id") @db.Uuid
-  tenant       Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id            String               @id @default(uuid()) @db.Uuid
+  name          String               @db.VarChar(160)
+  email         String               @unique @db.VarChar(320)
+  passwordHash  String               @map("password_hash")
+  role          UserRole             @default(STAFF)
+  tenantId      String?              @map("tenant_id") @db.Uuid
+  tenant        Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  notifications SystemNotification[]
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@index([tenantId, role])
   @@map("users")
@@ -39,17 +39,17 @@ model Tenant {
   @@map("tenants")
 }
 
-/// Global product identity. Tenant business details are stored separately.
+/// Global product identity. Default branding values live in lib/branding/defaults.ts.
 model PlatformSettings {
   id             String   @id @default("global") @db.VarChar(32)
-  productName    String   @default("Business CRM") @map("product_name") @db.VarChar(120)
-  productTagline String   @default("A clearer way to run your business.") @map("product_tagline") @db.VarChar(240)
+  productName    String   @map("product_name") @db.VarChar(120)
+  productTagline String   @map("product_tagline") @db.VarChar(240)
   logoUrl        String?  @map("logo_url") @db.VarChar(2048)
   faviconUrl     String?  @map("favicon_url") @db.VarChar(2048)
-  primaryColor   String   @default("#2563EB") @map("primary_color") @db.VarChar(7)
+  primaryColor   String   @map("primary_color") @db.VarChar(7)
   supportEmail   String?  @map("support_email") @db.VarChar(320)
   supportWebsite String?  @map("support_website") @db.VarChar(2048)
-  footerText     String   @default("© {year} {product_name}. All rights reserved.") @map("footer_text") @db.VarChar(500)
+  footerText     String   @map("footer_text") @db.VarChar(500)
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("platform_settings")
@@ -85,4 +85,23 @@ model AuditLog {
   @@index([entityType, entityId, createdAt])
   @@index([actorUserId, createdAt])
   @@map("audit_logs")
+}
+
+/// Durable, recipient-scoped in-app notification.
+model SystemNotification {
+  id              String    @id @default(uuid()) @db.Uuid
+  recipientUserId String    @map("recipient_user_id") @db.Uuid
+  recipient       User      @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  title           String    @db.VarChar(200)
+  body            String    @db.Text
+  href            String?   @db.VarChar(2048)
+  sourceLabel     String    @map("source_label") @db.VarChar(120)
+  supportEmail    String?   @map("support_email") @db.VarChar(320)
+  idempotencyKey  String?   @map("idempotency_key") @db.VarChar(200)
+  readAt          DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([recipientUserId, idempotencyKey])
+  @@index([recipientUserId, readAt, createdAt])
+  @@map("system_notifications")
 }
