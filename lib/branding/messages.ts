@@ -20,7 +20,7 @@ export type SystemMessage = {
   actionUrl?: string;
 };
 
-/** Email systems should call this at send time so emails use the current database branding. */
+/** Email systems call this at send time so the message uses current database branding. */
 export async function buildSystemEmail(message: SystemMessage) {
   const brand = await getPlatformBranding();
   const supportLine = brand.supportEmail ? "Support: " + brand.supportEmail : "";
@@ -42,7 +42,7 @@ export async function buildSystemEmail(message: SystemMessage) {
     escapeHtml(supportLine) + "</p><p>" + escapeHtml(footer) + "</p>" + supportLink + "</footer></body></html>";
   return {
     subject: message.subject,
-    text: [message.title, "", message.bodyText, "", supportLine, footer, supportUrl || ""].filter(Boolean).join("\n"),
+    text: [brand.productName, brand.productTagline, "", message.title, "", message.bodyText, "", supportLine, footer, supportUrl || ""].filter(Boolean).join("\n"),
     html,
     branding: { productName: brand.productName, supportEmail: brand.supportEmail, supportWebsite: supportUrl },
   };
