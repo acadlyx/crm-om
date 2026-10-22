@@ -20,7 +20,13 @@ test("branding update persists and appears on a fresh request without restarting
 
   const changedName = "Live Branding " + Date.now();
   await page.getByLabel(/product name/i).fill(changedName);
+  const saveResponsePromise = page.waitForResponse(response =>
+    response.url() === apiUrl && response.request().method() === "PATCH",
+  );
   await page.getByRole("button", { name: /save branding/i }).click();
+  const saveResponse = await saveResponsePromise;
+  const savePayload: unknown = await saveResponse.json().catch(() => null);
+  expect(saveResponse.ok(), "Branding save failed: HTTP " + saveResponse.status() + " " + JSON.stringify(savePayload)).toBeTruthy();
   await expect(page.getByRole("status")).toContainText(/branding saved/i);
 
   // No process restart or build occurs between the update and this fresh request.
@@ -30,7 +36,7 @@ test("branding update persists and appears on a fresh request without restarting
   const persistedResponse = await request.get(apiUrl);
   expect((await persistedResponse.json()).data.productName).toBe(changedName);
 
-  // browserContext.request shares the authenticated browser cookies with the page.
+  // Use the logged-in browser session to restore settings for repeatable local runs.
   const { updatedAt: _updatedAt, ...originalConfig } = initial;
   const restore = await page.context().request.fetch(apiUrl, {
     method: "PATCH",
