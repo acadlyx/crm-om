@@ -1,8 +1,13 @@
 import { z } from "zod";
 
 const httpUrl = z.string().trim().url().max(2048).refine((value) => {
-  const protocol = new URL(value).protocol;
-  return protocol === "http:" || protocol === "https:";
+  try {
+    const protocol = new URL(value).protocol;
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    // Zod can run refinements after an earlier URL-format issue; malformed values must fail validation, not throw.
+    return false;
+  }
 }, "URL must use HTTP or HTTPS");
 const optionalEmail = z.union([
   z.string().trim().email().max(320), z.literal(""), z.null(),

@@ -48,6 +48,7 @@ export async function sendSystemEmail(
 
   const rendered = await buildSystemEmail(message);
   const senderName = safeDisplayName(rendered.branding.productName);
+  const recipientList = Array.isArray(recipients.data) ? recipients.data : [recipients.data];
   let response: Response;
   try {
     response = await fetch("https://api.resend.com/emails", {
@@ -59,7 +60,7 @@ export async function sendSystemEmail(
       },
       body: JSON.stringify({
         from: '"' + senderName + '" <' + validFrom.data + ">",
-        to: recipients.data,
+        to: recipientList,
         subject: message.subject.trim(),
         html: rendered.html,
         text: rendered.text,
