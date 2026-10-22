@@ -14,6 +14,7 @@ vi.mock("@/lib/branding/service", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 
 import { GET, PATCH } from "../app/api/v1/platform-settings/branding/route";
+import { isSameOriginRequest } from "../lib/security/http";
 
 const valid = {
   productName: "New Neutral Name",
@@ -33,6 +34,38 @@ function req(body: unknown, headers: Record<string,string> = {}) {
     body: JSON.stringify(body),
   }) as never;
 }
+
+describe("same-origin request guard", () => {
+  it("accepts the configured public origin when a reverse proxy changes the internal request URL", () => {
+    const previous = process.env.NEXTAUTH_URL;
+    process.env.NEXTAUTH_URL = "https://crm.example.test";
+    try {
+      const request = new Request("http://internal-service:3000/api/v1/platform-settings/branding", {
+        method: "PATCH",
+        headers: { origin: "https://crm.example.test" },
+      });
+      expect(isSameOriginRequest(request)).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.NEXTAUTH_URL;
+      else process.env.NEXTAUTH_URL = previous;
+    }
+  });
+
+  it("rejects a foreign origin even when a canonical public origin is configured", () => {
+    const previous = process.env.NEXTAUTH_URL;
+    process.env.NEXTAUTH_URL = "https://crm.example.test";
+    try {
+      const request = new Request("http://internal-service:3000/api/v1/platform-settings/branding", {
+        method: "PATCH",
+        headers: { origin: "https://attacker.example" },
+      });
+      expect(isSameOriginRequest(request)).toBe(false);
+    } finally {
+      if (previous === undefined) delete process.env.NEXTAUTH_URL;
+      else process.env.NEXTAUTH_URL = previous;
+    }
+  });
+});
 
 describe("platform branding API", () => {
   beforeEach(() => {
