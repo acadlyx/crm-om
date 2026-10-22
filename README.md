@@ -1,23 +1,26 @@
 # CRM-OM
 
-Multi-tenant CRM foundation with database-backed, request-time product branding.
+Multi-tenant CRM foundation with centralized database-backed product branding, tenant-specific business identity, durable in-app notifications and an optional Resend email delivery adapter.
 
-## Setup
-1. Copy .env.example to .env and configure PostgreSQL, session secrets and S3-compatible storage.
-2. Run npm install.
-3. Run npm run db:generate and npm run db:migrate.
-4. Set PLATFORM_ADMIN_EMAIL and a PLATFORM_ADMIN_PASSWORD of at least 12 characters, then run npm run db:seed.
-5. Run npm run dev.
+## Local setup
+1. Use Node.js 22 and PostgreSQL 16+.
+2. Copy .env.example to .env and set DATABASE_URL, NEXTAUTH_URL, NEXTAUTH_SECRET and PLATFORM_ADMIN_EMAIL/PLATFORM_ADMIN_PASSWORD.
+3. Run npm install.
+4. Apply migrations and generate the client with: npm run db:migrate && npm run db:generate.
+5. Seed the local platform administrator with npm run db:seed.
+6. Run npm run dev.
 
-The final product name is intentionally undecided. A neutral temporary fallback, Business CRM, is configured centrally. Update it at Platform Settings -> Branding after signing in as a platform administrator.
+## Product branding
+The temporary product name and other fallbacks are defined in lib/branding/defaults.ts. The Platform Settings -> Branding screen updates the singleton platform_settings row. Requests read that row dynamically, API responses are no-store, and settings writes invalidate the root layout. There is no build-time branding cache; fresh requests/navigation reflect updates without deploying a new build. Logo and favicon URLs are versioned to reduce stale browser/CDN assets.
 
-## Design notes
-- platform_settings is a global singleton, separate from tenant business_settings.
-- Platform branding is loaded server-side on dynamic requests; GET responses are no-store, and updates invalidate relevant routes.
-- Only PLATFORM_ADMIN may update global brand settings or upload global brand assets.
-- Tenant business settings use the authenticated user's tenant ID. API input cannot select an arbitrary tenant.
-- Logo and favicon assets require configured S3-compatible storage; image bytes, type and size are validated.
-- Shared email and notification modules should call the centralized branding message helper; the empty base repository has no pre-existing dispatch provider to wire directly.
+Tenant-owned business identity lives in business_settings and is managed through a separate session-scoped API. Tenant administrators cannot update global platform branding or select another tenant by sending an ID.
+
+## Delivery integration
+- System email: lib/messaging/resend.ts calls the Resend email API and renders the configured database branding at send time. Set RESEND_API_KEY and RESEND_FROM_EMAIL to a sender address verified by your Resend account.
+- Use lib/messaging/delivery.ts from server-side business events to create a durable branded in-app notification and optionally send email in the same workflow.
+- In-app notifications are persisted in system_notifications and displayed in /notifications. The page fetches the current product name at request time; notifications and mark-as-read actions are scoped to the authenticated recipient.
+- Provider acceptance is not proof of inbox delivery. Delivery requires valid Resend credentials and a verified sender/domain.
+- This repository began empty and contains no pre-existing business email or notification dispatch workflows. The delivery service is the integration point for future workflows; it does not fake external delivery.
 
 ## Verification
-Run npm run typecheck, npm test, npm run lint, and npm run build. Database persistence and browser propagation need a configured PostgreSQL environment and must not be reported as verified until actually tested.
+Run npm run db:migrate, npm run db:generate, npm run db:seed, npm run typecheck, npm run lint, npm run audit:branding, npm test, npm run build, and npm run test:e2e. Branding CI provisions PostgreSQL and includes a browser test that updates the brand and verifies the fresh title and database state while the same server remains running.
