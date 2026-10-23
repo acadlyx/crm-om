@@ -18,22 +18,22 @@ async function main() {
   if (password.length < 12) {
     throw new Error("PLATFORM_ADMIN_PASSWORD must be at least 12 characters.");
   }
-    const passwordHash = await hash(password, 12);
-    await prisma.user.upsert({
-      where: { email },
-      update: {
-        name: process.env.PLATFORM_ADMIN_NAME || "Platform Administrator",
-        role: UserRole.PLATFORM_ADMIN,
-        passwordHash,
-        tenantId: null,
-      },
-      create: {
-        email,
-        passwordHash,
-        name: process.env.PLATFORM_ADMIN_NAME || "Platform Administrator",
-        role: UserRole.PLATFORM_ADMIN,
-      },
-    });
+  const passwordHash = await hash(password, 12);
+  await prisma.user.upsert({
+    where: { email },
+    update: {
+      name: process.env.PLATFORM_ADMIN_NAME || "Platform Administrator",
+      role: UserRole.PLATFORM_ADMIN,
+      passwordHash,
+      tenantId: null,
+    },
+    create: {
+      email,
+      passwordHash,
+      name: process.env.PLATFORM_ADMIN_NAME || "Platform Administrator",
+      role: UserRole.PLATFORM_ADMIN,
+    },
+  });
   console.info(`Platform admin upserted for ${email}.`);
 
   await prisma.platformSettings.upsert({
