@@ -249,6 +249,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
   if (!parsed.success) return fail(parsed.error.issues[0]?.message || "Please check the submitted fields.");
   const tenantId = access.tenantId;
   const actorId = access.user.id;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `validator` is selected by `resource`; Zod has already validated this resource-specific object.
   const data = parsed.data as Record<string, any>;
 
   try {
