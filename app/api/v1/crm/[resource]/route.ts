@@ -56,6 +56,7 @@ const validators = {
     reference: optionalText,
     paidAt: optionalDate,
     notes: optionalText,
+    idempotencyKey: z.string().trim().min(8).max(160),
   }),
   expenses: z.object({
     title: z.string().trim().min(1).max(200),
@@ -164,6 +165,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
   try {
     let created: { id: string } | null = null;
     let auditRecorded = false;
+    let idempotentReplay = false;
     switch (resource) {
       case "customers":
         created = await db.customer.create({
@@ -218,7 +220,12 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         break;
       }
       case "payments": {
-        created = await db.$transaction(async (tx) => {
+        const result = await db.$transaction(async (tx) => {
+          const existing = await tx.payment.findUnique({
+            where: { tenantId_idempotencyKey: { tenantId, idempotencyKey: data.idempotencyKey } },
+            select: { id: true },
+          });
+          if (existing) return { payment: existing, replay: true as const };
           const invoice = await tx.invoice.findFirst({
             where: { id: data.invoiceId, tenantId, status: { not: "CANCELLED" } },
             include: {
@@ -234,7 +241,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
           const amount = Number(data.amount);
           if (amount > balance + 0.005) throw new Error("PAYMENT_EXCEEDS_BALANCE");
           const payment = await tx.payment.create({
-            data: { tenantId, invoiceId: invoice.id, amount, method: data.method, reference: data.reference ?? null, paidAt: data.paidAt ?? new Date(), notes: data.notes ?? null, status: "POSTED" },
+            data: { tenantId, invoiceId: invoice.id, amount, method: data.method, reference: data.reference ?? null, paidAt: data.paidAt ?? new Date(), notes: data.notes ?? null, status: "POSTED", idempotencyKey: data.idempotencyKey },
             select: { id: true },
           });
           const paidAfter = received + amount;
@@ -248,8 +255,10 @@ export async function POST(request: Request, context: { params: Promise<{ resour
             debit: 0, credit: amount, idempotencyKey: "payment-" + payment.id, createdByUserId: access.user.id,
           } });
           await tx.auditLog.create({ data: { actorUserId: access.user.id, action: "CUSTOMER_PAYMENT_POSTED", entityType: "Payment", entityId: payment.id, metadata: { invoiceId: invoice.id, amount } } });
-          return payment;
+          return { payment, replay: false as const };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        created = result.payment;
+        idempotentReplay = result.replay;
         auditRecorded = true;
         break;
       }
@@ -286,7 +295,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         entityId: created.id,
       });
     }
-    return Response.json({ data: { id: created?.id } }, { status: 201 });
+    return Response.json({ data: { id: created?.id }, idempotentReplay }, { status: idempotentReplay ? 200 : 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message === "CUSTOMER_NOT_FOUND") return Response.json({ error: { message: "Select a customer from your own workspace." } }, { status: 400 });
@@ -295,6 +304,12 @@ export async function POST(request: Request, context: { params: Promise<{ resour
     }
     if (message === "PAYMENT_EXCEEDS_BALANCE") {
       return Response.json({ error: { message: "Payment is greater than the remaining invoice balance. Refresh the page and try again." } }, { status: 400 });
+    }
+    if ((error as { code?: string }).code === "P2002") {
+      return Response.json({ error: { message: "A duplicate transaction key was submitted. Retry with the same key to safely check the existing result." } }, { status: 409 });
+    }
+    if ((error as { code?: string }).code === "P2034") {
+      return Response.json({ error: { message: "Another transaction changed this invoice concurrently. Retry the same request with the same idempotency key." } }, { status: 409 });
     }
     const known = error as { code?: string };
     console.error("CRM create failed:", resource, known?.code || "UNKNOWN");
