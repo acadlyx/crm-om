@@ -28,6 +28,7 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
   const permission = await requireWorkspacePermission(access, section, "read");
   if (!permission.ok) notFound();
   const updatePermission = await requireWorkspacePermission(access, section, "update");
+  const deletePermission = await requireWorkspacePermission(access, section, "delete");
 
   if (section === "reports") {
     const monthStart = new Date();
@@ -140,7 +141,7 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
         id: item.id, name: item.name, company: item.company, email: item.email, phone: item.phone,
         address: Array.isArray(item.addresses) ? item.addresses.map(String).join(", ") : "",
         creditLimit: Number(item.creditLimit), paymentTermsDays: item.paymentTermsDays, notes: item.notes,
-        status: item.status, createdAt: item.createdAt.toISOString(),
+        status: item.status, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString(),
       }));
       fields = [
         { name: "name", label: "Contact / customer name", type: "text", required: true, placeholder: "Full name" },
@@ -156,7 +157,8 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
         { key: "name", label: "Customer" }, { key: "company", label: "Company" },
         { key: "email", label: "Email" }, { key: "phone", label: "Phone" },
         { key: "address", label: "Address" }, { key: "creditLimit", label: "Credit limit" },
-        { key: "paymentTermsDays", label: "Terms (days)" }, { key: "status", label: "Status" },
+        { key: "paymentTermsDays", label: "Terms (days)" }, { key: "notes", label: "Notes" },
+        { key: "status", label: "Status" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
       ];
       workflow = { field: "status", label: "Status", options: [{ label: "Active", value: "ACTIVE" }, { label: "Inactive", value: "INACTIVE" }] };
       break;
@@ -165,7 +167,7 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       title = "Leads"; resource = "leads"; recordLabel = "lead";
       description = "Capture prospects, where they came from, potential value and next sales status.";
       const records = await db.lead.findMany({ where: { tenantId }, orderBy: { createdAt: "desc" }, take: 300 });
-      rows = records.map((item) => ({ id: item.id, fullName: item.fullName, company: item.company, email: item.email, phone: item.phone, source: item.source, status: item.status, estimatedValue: Number(item.estimatedValue), createdAt: item.createdAt.toISOString() }));
+      rows = records.map((item) => ({ id: item.id, fullName: item.fullName, company: item.company, email: item.email, phone: item.phone, source: item.source, status: item.status, estimatedValue: Number(item.estimatedValue), notes: item.notes, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString() }));
       fields = [
         { name: "fullName", label: "Contact name", type: "text", required: true, placeholder: "Prospect name" },
         { name: "company", label: "Company", type: "text", placeholder: "Company / business" },
@@ -176,7 +178,11 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
         { name: "status", label: "Initial status", type: "select", options: [{ label: "New", value: "NEW" }, { label: "Contacted", value: "CONTACTED" }, { label: "Qualified", value: "QUALIFIED" }] },
         { name: "notes", label: "Notes", type: "textarea", placeholder: "What they need and next follow-up" },
       ];
-      columns = [{ key: "fullName", label: "Lead" }, { key: "company", label: "Company" }, { key: "source", label: "Source" }, { key: "estimatedValue", label: "Potential value" }, { key: "status", label: "Status" }];
+      columns = [
+        { key: "fullName", label: "Lead" }, { key: "company", label: "Company" }, { key: "email", label: "Email" },
+        { key: "phone", label: "Phone" }, { key: "source", label: "Source" }, { key: "estimatedValue", label: "Potential value" },
+        { key: "notes", label: "Notes" }, { key: "status", label: "Status" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
+      ];
       workflow = { field: "status", label: "Progress", options: [{ label: "New", value: "NEW" }, { label: "Contacted", value: "CONTACTED" }, { label: "Qualified", value: "QUALIFIED" }, { label: "Converted", value: "CONVERTED" }, { label: "Lost", value: "LOST" }] };
       break;
     }
@@ -184,7 +190,13 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       title = "Sales pipeline"; resource = "deals"; recordLabel = "deal";
       description = "Track the value and stage of sales opportunities from qualification to won or lost.";
       const records = await db.deal.findMany({ where: { tenantId }, include: { customer: { select: { name: true, company: true } }, lead: { select: { fullName: true, company: true } } }, orderBy: { createdAt: "desc" }, take: 300 });
-      rows = records.map((item) => ({ id: item.id, title: item.title, contact: item.customer?.name || item.lead?.fullName || "Unlinked", value: Number(item.value), stage: item.stage, expectedCloseDate: item.expectedCloseDate?.toISOString() || null }));
+      rows = records.map((item) => ({
+        id: item.id, title: item.title, contact: item.customer?.name || item.lead?.fullName || "Unlinked",
+        company: item.customer?.company || item.lead?.company || null, customerName: item.customer?.name || null,
+        leadName: item.lead?.fullName || null, value: Number(item.value), stage: item.stage,
+        expectedCloseDate: item.expectedCloseDate?.toISOString() || null, closedAt: item.closedAt?.toISOString() || null,
+        notes: item.notes, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString(),
+      }));
       fields = [
         { name: "title", label: "Opportunity / deal", type: "text", required: true, placeholder: "e.g. Annual service contract" },
         { name: "customerId", label: "Customer (optional)", type: "select", options: customerOptions },
@@ -194,7 +206,11 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
         { name: "expectedCloseDate", label: "Expected close date", type: "date" },
         { name: "notes", label: "Notes", type: "textarea", placeholder: "Scope, blockers and next steps" },
       ];
-      columns = [{ key: "title", label: "Opportunity" }, { key: "contact", label: "Related contact" }, { key: "value", label: "Value" }, { key: "expectedCloseDate", label: "Expected close" }, { key: "stage", label: "Stage" }];
+      columns = [
+        { key: "title", label: "Opportunity" }, { key: "contact", label: "Related contact" }, { key: "company", label: "Company" },
+        { key: "value", label: "Value" }, { key: "expectedCloseDate", label: "Expected close" }, { key: "closedAt", label: "Closed at" },
+        { key: "stage", label: "Stage" }, { key: "notes", label: "Notes" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
+      ];
       workflow = { field: "stage", label: "Move stage", options: [{ label: "Qualification", value: "QUALIFICATION" }, { label: "Proposal", value: "PROPOSAL" }, { label: "Negotiation", value: "NEGOTIATION" }, { label: "Won", value: "WON" }, { label: "Lost", value: "LOST" }] };
       break;
     }
@@ -207,7 +223,13 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
         const balance = Math.max(0, Number(item.total) - paidAmount);
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const status = balance > 0 && item.dueDate < today && item.status !== "CANCELLED" ? "OVERDUE" : item.status;
-        return { id: item.id, invoiceNumber: item.invoiceNumber, customerName: item.customer.name, total: Number(item.total), paidAmount, balance, status, dueDate: item.dueDate.toISOString() };
+        return {
+          id: item.id, invoiceNumber: item.invoiceNumber, customerName: item.customer.name, customerCompany: item.customer.company,
+          issueDate: item.issueDate.toISOString(), dueDate: item.dueDate.toISOString(), subtotal: Number(item.subtotal),
+          discountAmount: Number(item.discountAmount), taxAmount: Number(item.taxAmount), total: Number(item.total),
+          paidAmount, balance, status, notes: item.notes, salesOrderId: item.salesOrderId,
+          createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString(),
+        };
       });
       fields = [
         { name: "customerId", label: "Bill to customer", type: "select", required: true, options: customerOptions },
@@ -217,7 +239,13 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
         { name: "taxAmount", label: "Tax amount (₹)", type: "number", step: "0.01", placeholder: "0.00" },
         { name: "notes", label: "Notes / payment terms", type: "textarea", placeholder: "Payment terms or work description" },
       ];
-      columns = [{ key: "invoiceNumber", label: "Invoice" }, { key: "customerName", label: "Customer" }, { key: "total", label: "Total" }, { key: "paidAmount", label: "Paid" }, { key: "balance", label: "Remaining" }, { key: "dueDate", label: "Due date" }, { key: "status", label: "Status" }];
+      columns = [
+        { key: "invoiceNumber", label: "Invoice" }, { key: "customerName", label: "Customer" }, { key: "customerCompany", label: "Company" },
+        { key: "issueDate", label: "Issue date" }, { key: "dueDate", label: "Due date" }, { key: "subtotal", label: "Subtotal" },
+        { key: "discountAmount", label: "Discount" }, { key: "taxAmount", label: "Tax" }, { key: "total", label: "Total" },
+        { key: "paidAmount", label: "Paid" }, { key: "balance", label: "Remaining" }, { key: "status", label: "Status" },
+        { key: "salesOrderId", label: "Sales order ID" }, { key: "notes", label: "Notes" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
+      ];
       break;
     }
     case "payments": {
@@ -227,7 +255,11 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
         db.payment.findMany({ where: { tenantId }, include: { invoice: { select: { invoiceNumber: true, customer: { select: { name: true } } } } }, orderBy: { paidAt: "desc" }, take: 300 }),
         db.invoice.findMany({ where: { tenantId, status: { not: "CANCELLED" } }, include: { customer: { select: { name: true } }, payments: { select: { amount: true, status: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } }, orderBy: { dueDate: "asc" }, take: 300 }),
       ]);
-      rows = records.map((item) => ({ id: item.id, invoiceNumber: item.invoice.invoiceNumber, customerName: item.invoice.customer.name, amount: Number(item.amount), method: item.method, reference: item.reference, paidAt: item.paidAt.toISOString(), status: item.status }));
+      rows = records.map((item) => ({
+        id: item.id, invoiceNumber: item.invoice.invoiceNumber, customerName: item.invoice.customer.name,
+        amount: Number(item.amount), method: item.method, reference: item.reference, paidAt: item.paidAt.toISOString(),
+        notes: item.notes, status: item.status, createdAt: item.createdAt.toISOString(),
+      }));
       const invoiceOptions = invoicesForPayment.map((item) => {
         const paid = item.payments.filter((payment) => payment.status === "POSTED").reduce((sum, payment) => sum + Number(payment.amount), 0) + item.receiptAllocations.filter((allocation) => allocation.receipt.status === "POSTED").reduce((sum, allocation) => sum + Number(allocation.amount), 0);
         return { item, balance: Math.max(0, Number(item.total) - paid) };
@@ -240,7 +272,11 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
         { name: "paidAt", label: "Payment date", type: "date" },
         { name: "notes", label: "Notes", type: "textarea", placeholder: "Optional receipt notes" },
       ];
-      columns = [{ key: "invoiceNumber", label: "Invoice" }, { key: "customerName", label: "Customer" }, { key: "amount", label: "Amount received" }, { key: "method", label: "Method" }, { key: "reference", label: "Reference" }, { key: "paidAt", label: "Received on" }, { key: "status", label: "Status" }];
+      columns = [
+        { key: "invoiceNumber", label: "Invoice" }, { key: "customerName", label: "Customer" }, { key: "amount", label: "Amount received" },
+        { key: "method", label: "Method" }, { key: "reference", label: "UTR / reference" }, { key: "paidAt", label: "Received on" },
+        { key: "notes", label: "Notes" }, { key: "status", label: "Status" }, { key: "createdAt", label: "Created" },
+      ];
       if (!invoiceOptions.length) description = "No unpaid invoices right now. Create an invoice first; the system will prevent payments greater than the amount still owed.";
       break;
     }
@@ -248,7 +284,7 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       title = "Expenses"; resource = "expenses"; recordLabel = "expense";
       description = "Record operating costs, vendors, payment method and whether an expense has been paid or is still planned.";
       const records = await db.expense.findMany({ where: { tenantId }, orderBy: { spentAt: "desc" }, take: 300 });
-      rows = records.map((item) => ({ id: item.id, title: item.title, category: item.category, amount: Number(item.amount), vendor: item.vendor, method: item.method, status: item.status, spentAt: item.spentAt.toISOString() }));
+      rows = records.map((item) => ({ id: item.id, title: item.title, category: item.category, amount: Number(item.amount), vendor: item.vendor, method: item.method, status: item.status, spentAt: item.spentAt.toISOString(), notes: item.notes, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString() }));
       fields = [
         { name: "title", label: "Expense description", type: "text", required: true, placeholder: "Rent, software subscription, travel…" },
         { name: "category", label: "Category", type: "text", placeholder: "Rent, payroll, marketing, software…" },
@@ -259,7 +295,11 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
         { name: "status", label: "Payment status", type: "select", options: [{ label: "Paid", value: "PAID" }, { label: "Planned / unpaid", value: "PLANNED" }] },
         { name: "notes", label: "Notes", type: "textarea", placeholder: "Receipt number, cost centre or notes" },
       ];
-      columns = [{ key: "title", label: "Expense" }, { key: "category", label: "Category" }, { key: "vendor", label: "Paid to" }, { key: "amount", label: "Amount" }, { key: "method", label: "Method" }, { key: "spentAt", label: "Date" }, { key: "status", label: "Status" }];
+      columns = [
+        { key: "title", label: "Expense" }, { key: "category", label: "Category" }, { key: "vendor", label: "Paid to" },
+        { key: "amount", label: "Amount" }, { key: "method", label: "Method" }, { key: "spentAt", label: "Expense date" },
+        { key: "status", label: "Status" }, { key: "notes", label: "Notes" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
+      ];
       workflow = { field: "status", label: "Payment status", options: [{ label: "Paid", value: "PAID" }, { label: "Planned / unpaid", value: "PLANNED" }] };
       break;
     }
@@ -267,7 +307,7 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       title = "Tasks & follow-ups"; resource = "tasks"; recordLabel = "task";
       description = "Make sure calls, customer follow-ups, sales actions and deadlines do not slip through the cracks.";
       const records = await db.task.findMany({ where: { tenantId }, include: { customer: { select: { name: true } } }, orderBy: [{ status: "asc" }, { dueDate: "asc" }, { createdAt: "desc" }], take: 300 });
-      rows = records.map((item) => ({ id: item.id, title: item.title, customerName: item.customer?.name || null, priority: item.priority, status: item.status, dueDate: item.dueDate?.toISOString() || null }));
+      rows = records.map((item) => ({ id: item.id, title: item.title, customerName: item.customer?.name || null, description: item.description, priority: item.priority, status: item.status, dueDate: item.dueDate?.toISOString() || null, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString() }));
       fields = [
         { name: "title", label: "Task", type: "text", required: true, placeholder: "Call customer, send quotation…" },
         { name: "customerId", label: "Related customer (optional)", type: "select", options: customerOptions },
@@ -276,7 +316,11 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
         { name: "status", label: "Status", type: "select", options: [{ label: "To do", value: "TODO" }, { label: "In progress", value: "IN_PROGRESS" }, { label: "Done", value: "DONE" }] },
         { name: "description", label: "Description", type: "textarea", placeholder: "Details, owner and next action" },
       ];
-      columns = [{ key: "title", label: "Task" }, { key: "customerName", label: "Customer" }, { key: "dueDate", label: "Due" }, { key: "priority", label: "Priority" }, { key: "status", label: "Status" }];
+      columns = [
+        { key: "title", label: "Task" }, { key: "customerName", label: "Customer" }, { key: "description", label: "Description" },
+        { key: "dueDate", label: "Due" }, { key: "priority", label: "Priority" }, { key: "status", label: "Status" },
+        { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
+      ];
       workflow = { field: "status", label: "Update progress", options: [{ label: "To do", value: "TODO" }, { label: "In progress", value: "IN_PROGRESS" }, { label: "Done", value: "DONE" }] };
       break;
     }
@@ -284,5 +328,5 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       notFound();
   }
 
-  return <CrmModule key={JSON.stringify(rows)} resource={resource} title={title} description={description} fields={fields} columns={columns} initialRows={rows} workflow={workflow} recordLabel={recordLabel} owner={access.user.role === "TENANT_ADMIN" || access.user.role === "PLATFORM_ADMIN"} canUpdate={updatePermission.ok} />;
+  return <CrmModule key={JSON.stringify(rows)} resource={resource} title={title} description={description} fields={fields} columns={columns} initialRows={rows} workflow={workflow} recordLabel={recordLabel} owner={access.user.role === "TENANT_ADMIN" || access.user.role === "PLATFORM_ADMIN"} canUpdate={updatePermission.ok} canDelete={deletePermission.ok} />;
 }
