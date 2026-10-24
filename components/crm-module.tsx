@@ -71,6 +71,7 @@ export function CrmModule({
   const [busyRow, setBusyRow] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [paymentKey, setPaymentKey] = useState<{ signature: string; key: string } | null>(null);
 
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -84,7 +85,13 @@ export function CrmModule({
     setError("");
     setNotice("");
     const form = event.currentTarget;
-    const payload = Object.fromEntries(new FormData(form).entries());
+    const payload: Record<string, unknown> = Object.fromEntries(new FormData(form).entries());
+    if (resource === "payments") {
+      const signature = JSON.stringify(payload);
+      const key = paymentKey?.signature === signature ? paymentKey.key : crypto.randomUUID();
+      payload.idempotencyKey = key;
+      setPaymentKey({ signature, key });
+    }
     try {
       const response = await fetch("/api/v1/crm/" + resource, {
         method: "POST",
@@ -94,7 +101,8 @@ export function CrmModule({
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result?.error?.message || "Could not save this record.");
-      setNotice("Saved successfully.");
+      setNotice(result?.idempotentReplay ? "This payment request was already processed; no duplicate payment was created." : "Saved successfully.");
+      if (resource === "payments") setPaymentKey(null);
       if (result?.data?.id) setRows((current) => [result.data as CrmRow, ...current.filter((row) => row.id !== result.data.id)]);
       setVisibleCount(3);
       form.reset();
