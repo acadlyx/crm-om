@@ -113,7 +113,6 @@ const validators = {
     productId: z.string().uuid(),
     movementType: inventoryType,
     quantity,
-    unitCost: money.optional().default(0),
     notes: maybeText,
     idempotencyKey: z.string().trim().min(8).max(160),
   }).strict(),
