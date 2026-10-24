@@ -720,18 +720,18 @@ function RowActions({ resource, row, owner, canUpdate, onChange, onUpdate, onInv
   onEdit: (row: Row) => void;
 }) {
   if (resource === "sales-orders") return <div className="operations-row-actions">
-    {owner && row.status === "DRAFT" && <button type="button" className="crm-secondary-button" onClick={()=>onEdit(row)}>Edit draft</button>}
-    {row.status === "DRAFT" && <button type="button" className="crm-secondary-button" onClick={()=>onChange(row,"CONFIRMED")}>Confirm</button>}
+    {canUpdate && row.status === "DRAFT" && <button type="button" className="crm-secondary-button" onClick={()=>onEdit(row)}>Edit draft</button>}
+    {canUpdate && row.status === "DRAFT" && <button type="button" className="crm-secondary-button" onClick={()=>onChange(row,"CONFIRMED")}>Confirm</button>}
     {owner && ["CONFIRMED","PARTIALLY_DELIVERED","DELIVERED"].includes(row.status) && !(row.invoices || []).length && <button type="button" className="crm-secondary-button" onClick={()=>onInvoice(row)}>Issue invoice</button>}
-    {["DRAFT","CONFIRMED","PARTIALLY_DELIVERED"].includes(row.status) && <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"CANCELLED")}>Cancel</button>}
+    {canUpdate && ["DRAFT","CONFIRMED","PARTIALLY_DELIVERED"].includes(row.status) && <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"CANCELLED")}>Cancel</button>}
     {(row.invoices || []).map((invoice: Row) => <a key={invoice.id} className="crm-pill crm-pill-active" href={"/operations/invoices/" + invoice.id}>{invoice.invoiceNumber}</a>)}
   </div>;
   if (resource === "purchase-orders") return <div className="operations-row-actions">
-    {!["CANCELLED","RECEIVED"].includes(row.status) && <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"CANCELLED")}>Cancel</button>}
+    {canUpdate && !["CANCELLED","RECEIVED"].includes(row.status) && <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"CANCELLED")}>Cancel</button>}
   </div>;
   if (resource === "deliveries") return <div className="operations-row-actions">
-    {row.status === "PENDING" && <button type="button" className="crm-secondary-button" onClick={()=>onChange(row,"DISPATCHED")}>Dispatch</button>}
-    {["PENDING","DISPATCHED"].includes(row.status) && <>
+    {canUpdate && row.status === "PENDING" && <button type="button" className="crm-secondary-button" onClick={()=>onChange(row,"DISPATCHED")}>Dispatch</button>}
+    {canUpdate && ["PENDING","DISPATCHED"].includes(row.status) && <>
       <button type="button" className="crm-secondary-button" onClick={()=>onChange(row,"PARTIALLY_DELIVERED")}>Post delivery</button>
       <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"FAILED")}>Failed</button>
       <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"CANCELLED")}>Cancel</button>
@@ -740,7 +740,7 @@ function RowActions({ resource, row, owner, canUpdate, onChange, onUpdate, onInv
   if (["goods-receipts","customer-receipts","supplier-payments"].includes(resource) && row.status === "POSTED" && owner) {
     return <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"REVERSED")}>Reverse</button>;
   }
-  if (resource === "customer-follow-ups" && row.status === "OPEN") return <div className="operations-row-actions">
+  if (resource === "customer-follow-ups" && canUpdate && row.status === "OPEN") return <div className="operations-row-actions">
     <button type="button" className="crm-secondary-button" onClick={()=>onUpdate(row,{status:"COMPLETED"})}>Complete</button>
     <button type="button" className="crm-secondary-button is-danger" onClick={()=>onUpdate(row,{status:"CANCELLED"})}>Cancel</button>
   </div>;
