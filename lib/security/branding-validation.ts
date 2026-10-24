@@ -34,4 +34,9 @@ export const tenantSettingsSchema = z.object({
   invoicePrefix: z.string().trim().min(1).max(20).regex(/^[A-Za-z0-9_-]+$/),
   invoiceIdentity: z.record(z.string(), z.unknown()).default({}),
   preferences: z.record(z.string(), z.unknown()).default({}),
+  currency: z.string().trim().regex(/^[A-Z]{3}$/).default("INR"),
+  timezone: z.string().trim().min(1).max(80).default("Asia/Kolkata"),
+  financialYearStartMonth: z.coerce.number().int().min(1).max(12).default(4),
+  inventoryCostingMethod: z.literal("WEIGHTED_AVERAGE").default("WEIGHTED_AVERAGE"),
+  defaultPaymentTermsDays: z.coerce.number().int().min(0).max(365).default(0),
 }).strict();
