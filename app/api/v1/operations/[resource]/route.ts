@@ -69,14 +69,16 @@ const validators = {
     receivedAt: maybeDate,
     notes: maybeText,
     idempotencyKey: z.string().trim().min(8).max(160),
-    items: z.array(z.object({ purchaseOrderItemId: z.string().uuid(), quantity, unitCost: money.optional() })).min(1).max(100),
+    items: z.array(z.object({ purchaseOrderItemId: z.string().uuid(), quantity }).strict()).min(1).max(100)
+      .refine((items) => new Set(items.map((item) => item.purchaseOrderItemId)).size === items.length, "Each purchase-order line can appear only once per goods receipt."),
   }).strict(),
   deliveries: z.object({
     orderId: z.string().uuid(),
     scheduledAt: maybeDate,
     assignedUserId: z.preprocess(blank, z.string().uuid().optional()),
     idempotencyKey: z.string().trim().min(8).max(160),
-    items: z.array(z.object({ orderItemId: z.string().uuid(), quantity })).min(1).max(100),
+    items: z.array(z.object({ orderItemId: z.string().uuid(), quantity }).strict()).min(1).max(100)
+      .refine((items) => new Set(items.map((item) => item.orderItemId)).size === items.length, "Each sales-order line can appear only once per delivery."),
   }).strict(),
   "customer-receipts": z.object({
     customerId: z.string().uuid(),
@@ -385,7 +387,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
           if (!item) throw new Error("PO_ITEM_NOT_FOUND");
           const receivedAfter = number(item.receivedQuantity) + line.quantity;
           if (receivedAfter > number(item.quantity) + 0.000001) throw new Error("RECEIPT_EXCEEDS_ORDERED");
-          receiptLines.push({ item, quantity: line.quantity, unitCost: line.unitCost ?? number(item.unitCost) });
+          receiptLines.push({ item, quantity: line.quantity, unitCost: number(item.unitCost) });
         }
         const receipt = await tx.goodsReceipt.create({ data: {
           tenantId, purchaseOrderId: order.id, receiptNumber: nextNumber("GR"),
@@ -601,7 +603,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         if (!update.count) throw new Error("INSUFFICIENT_STOCK");
         const movement = await tx.inventoryMovement.create({ data: {
           tenantId, productId: product.id, movementType: data.movementType, quantity: data.quantity,
-          unitCost: data.unitCost, referenceType: "MANUAL_ADJUSTMENT", referenceId: product.id,
+          unitCost: product.purchaseCost, referenceType: "MANUAL_ADJUSTMENT", referenceId: product.id,
           idempotencyKey: data.idempotencyKey, notes: data.notes ?? null, createdByUserId: actorId,
         } });
         await audit(tx, actorId, "INVENTORY_ADJUSTMENT_POSTED", "InventoryMovement", movement.id, { sku: product.sku, movementType: data.movementType, quantity: data.quantity });
