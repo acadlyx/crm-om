@@ -6,6 +6,7 @@ import {
   Package, ShoppingCart, Truck, Users, Wallet,
 } from "lucide-react";
 import { db } from "@/lib/db";
+import { sumPostedAmounts, sumPostedAllocations } from "@/lib/operations/finance";
 
 type PeriodKey = "TODAY" | "YESTERDAY" | "LAST_7_DAYS" | "LAST_30_DAYS" | "THIS_MONTH" | "FY" | "CUSTOM";
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -56,9 +57,7 @@ function invoicePaid(invoice: {
   payments: Array<{ amount: unknown; status?: string }>;
   receiptAllocations: Array<{ amount: unknown; receipt: { status: string } }>;
 }) {
-  const legacy = invoice.payments.filter((payment) => !payment.status || payment.status === "POSTED").reduce((sum, payment) => sum + number(payment.amount), 0);
-  const allocated = invoice.receiptAllocations.filter((entry) => entry.receipt.status === "POSTED").reduce((sum, entry) => sum + number(entry.amount), 0);
-  return legacy + allocated;
+  return sumPostedAmounts(invoice.payments) + sumPostedAllocations(invoice.receiptAllocations);
 }
 function currencyPercent(value: number) {
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(value) + "%";
