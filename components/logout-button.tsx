@@ -11,7 +11,7 @@ export function LogoutButton() {
     if (signingOut) return;
     setSigningOut(true);
     try {
-      await signOut({ callbackUrl: "/login" });
+      await signOut({ callbackUrl: "/logintoprivatecrmbysyzent7456" });
     } catch {
       setSigningOut(false);
     }
