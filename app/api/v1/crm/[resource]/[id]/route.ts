@@ -1,11 +1,14 @@
 import { z } from "zod";
 import { requireWorkspaceAccess, writeAuditEvent } from "@/lib/crm/access";
+import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { db } from "@/lib/db";
 
 export async function PATCH(request: Request, context: { params: Promise<{ resource: string; id: string }> }) {
   const access = await requireWorkspaceAccess();
   if (!access.ok) return Response.json({ error: { message: access.message } }, { status: access.status });
   const { resource, id } = await context.params;
+  const permission = await requireWorkspacePermission(access, resource, "update");
+  if (!permission.ok) return Response.json({ error: { message: permission.message } }, { status: permission.status });
   if (!z.string().uuid().safeParse(id).success) {
     return Response.json({ error: { message: "Invalid record identifier." } }, { status: 400 });
   }
