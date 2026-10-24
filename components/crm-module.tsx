@@ -72,7 +72,7 @@ export function CrmModule({
   const [busyRow, setBusyRow] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [paymentKey, setPaymentKey] = useState<{ signature: string; key: string } | null>(null);
+  const [financialIdempotencyKey, setFinancialIdempotencyKey] = useState<{ signature: string; key: string } | null>(null);
 
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -87,11 +87,11 @@ export function CrmModule({
     setNotice("");
     const form = event.currentTarget;
     const payload: Record<string, unknown> = Object.fromEntries(new FormData(form).entries());
-    if (resource === "payments") {
+    if (resource === "payments" || resource === "invoices") {
       const signature = JSON.stringify(payload);
-      const key = paymentKey?.signature === signature ? paymentKey.key : crypto.randomUUID();
+      const key = financialIdempotencyKey?.signature === signature ? financialIdempotencyKey.key : crypto.randomUUID();
       payload.idempotencyKey = key;
-      setPaymentKey({ signature, key });
+      setFinancialIdempotencyKey({ signature, key });
     }
     try {
       const response = await fetch("/api/v1/crm/" + resource, {
@@ -102,8 +102,10 @@ export function CrmModule({
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result?.error?.message || "Could not save this record.");
-      setNotice(result?.idempotentReplay ? "This payment request was already processed; no duplicate payment was created." : "Saved successfully.");
-      if (resource === "payments") setPaymentKey(null);
+      setNotice(result?.idempotentReplay
+        ? (resource === "payments" ? "This payment request was already processed; no duplicate payment was created." : "This invoice request was already processed; no duplicate invoice was created.")
+        : "Saved successfully.");
+      if (resource === "payments" || resource === "invoices") setFinancialIdempotencyKey(null);
       if (result?.data?.id) setRows((current) => [result.data as CrmRow, ...current.filter((row) => row.id !== result.data.id)]);
       setVisibleCount(3);
       form.reset();
