@@ -135,15 +135,28 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       title = "Customers"; resource = "customers"; recordLabel = "customer";
       description = "Keep every customer, company and contact detail in one workspace.";
       const records = await db.customer.findMany({ where: { tenantId }, orderBy: { createdAt: "desc" }, take: 300 });
-      rows = records.map((item) => ({ id: item.id, name: item.name, company: item.company, email: item.email, phone: item.phone, status: item.status, createdAt: item.createdAt.toISOString() }));
+      rows = records.map((item) => ({
+        id: item.id, name: item.name, company: item.company, email: item.email, phone: item.phone,
+        address: Array.isArray(item.addresses) ? item.addresses.map(String).join(", ") : "",
+        creditLimit: Number(item.creditLimit), paymentTermsDays: item.paymentTermsDays,
+        status: item.status, createdAt: item.createdAt.toISOString(),
+      }));
       fields = [
         { name: "name", label: "Contact / customer name", type: "text", required: true, placeholder: "Full name" },
         { name: "company", label: "Company", type: "text", placeholder: "Business name" },
         { name: "email", label: "Email", type: "email", placeholder: "name@company.com" },
         { name: "phone", label: "Phone", type: "tel", placeholder: "+91 ..." },
+        { name: "address", label: "Business / billing address", type: "textarea", placeholder: "Street, city, state, postal code" },
+        { name: "creditLimit", label: "Credit limit (₹; 0 = no limit)", type: "number", step: "0.01", placeholder: "0.00" },
+        { name: "paymentTermsDays", label: "Payment terms (days)", type: "number", step: "1", placeholder: "0" },
         { name: "notes", label: "Notes", type: "textarea", placeholder: "Preferences, context or next steps" },
       ];
-      columns = [{ key: "name", label: "Customer" }, { key: "company", label: "Company" }, { key: "email", label: "Email" }, { key: "phone", label: "Phone" }, { key: "status", label: "Status" }];
+      columns = [
+        { key: "name", label: "Customer" }, { key: "company", label: "Company" },
+        { key: "email", label: "Email" }, { key: "phone", label: "Phone" },
+        { key: "address", label: "Address" }, { key: "creditLimit", label: "Credit limit" },
+        { key: "paymentTermsDays", label: "Terms (days)" }, { key: "status", label: "Status" },
+      ];
       workflow = { field: "status", label: "Status", options: [{ label: "Active", value: "ACTIVE" }, { label: "Inactive", value: "INACTIVE" }] };
       break;
     }
