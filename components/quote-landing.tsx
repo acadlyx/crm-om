@@ -30,9 +30,7 @@ export function QuoteLanding() {
 
   useEffect(() => {
     // Randomize after hydration so server HTML and the first client render match.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setQuoteIndex(Math.floor(Math.random() * quotes.length));
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDesignIndex(Math.floor(Math.random() * designs.length));
   }, []);
 
