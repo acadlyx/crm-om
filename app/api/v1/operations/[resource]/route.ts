@@ -120,6 +120,12 @@ const validators = {
     assignedUserId: z.preprocess(blank, z.string().uuid().optional()),
     idempotencyKey: z.string().trim().min(8).max(160),
   }).strict(),
+  permissions: z.object({
+    role: z.enum(["STAFF", "SALES", "DELIVERY", "COLLECTIONS", "INVENTORY_MANAGER", "ACCOUNTANT"]),
+    moduleKey: z.string().trim().min(1).max(48),
+    actionKey: z.enum(["read", "create", "update", "delete", "manage"]),
+    granted: z.boolean(),
+  }).strict(),
 };
 
 function round2(value: number) { return Math.round((value + Number.EPSILON) * 100) / 100; }
@@ -198,11 +204,10 @@ async function rowsFor(resource: string, tenantId: string) {
   }
 }
 
-async function nextNumber(tenantId: string, prefix: string, model: "salesOrder" | "purchaseOrder" | "goodsReceipt" | "delivery" | "customerReceipt" | "supplierPayment") {
-  const latest = await db[model].findFirst({ where: { tenantId }, select: { createdAt: true } as never, orderBy: { createdAt: "desc" } as never }) as { createdAt: Date } | null;
+function nextNumber(prefix: string) {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   const timestamp = Date.now().toString(36).toUpperCase();
-  return prefix + "-" + date + "-" + timestamp + "-" + Math.random().toString(36).slice(2, 5).toUpperCase();
+  return prefix + "-" + date + "-" + timestamp + "-" + crypto.randomUUID().slice(0, 4).toUpperCase();
 }
 
 async function audit(tx: Prisma.TransactionClient, actorUserId: string, action: string, entityType: string, entityId: string, metadata: Record<string, unknown> = {}) {
@@ -296,7 +301,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         const taxAmount = round2(prepared.reduce((sum, item) => sum + item.tax, 0));
         const total = round2(subtotal - discountAmount + taxAmount);
         const order = await tx.salesOrder.create({ data: {
-          tenantId, customerId: customer.id, orderNumber: await nextNumber(tenantId, "SO", "salesOrder"),
+          tenantId, customerId: customer.id, orderNumber: nextNumber("SO"),
           status: data.status, orderDate: data.orderDate ?? new Date(), expectedDeliveryAt: data.expectedDeliveryAt ?? null,
           subtotal, discountAmount, taxAmount, total, notes: data.notes ?? null, idempotencyKey: data.idempotencyKey, createdByUserId: actorId,
           items: { create: prepared.map((item) => ({
@@ -327,7 +332,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         });
         const subtotal = round2(prepared.reduce((sum, item) => sum + item.total, 0));
         const order = await tx.purchaseOrder.create({ data: {
-          tenantId, supplierId: supplier.id, orderNumber: await nextNumber(tenantId, "PO", "purchaseOrder"),
+          tenantId, supplierId: supplier.id, orderNumber: nextNumber("PO"),
           orderDate: data.orderDate ?? new Date(), expectedAt: data.expectedAt ?? null,
           subtotal, taxAmount: 0, total: subtotal, notes: data.notes ?? null, idempotencyKey: data.idempotencyKey, createdByUserId: actorId,
           status: "ORDERED",
@@ -357,7 +362,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
           receiptLines.push({ item, quantity: line.quantity, unitCost: line.unitCost ?? number(item.unitCost) });
         }
         const receipt = await tx.goodsReceipt.create({ data: {
-          tenantId, purchaseOrderId: order.id, receiptNumber: await nextNumber(tenantId, "GR", "goodsReceipt"),
+          tenantId, purchaseOrderId: order.id, receiptNumber: nextNumber("GR"),
           receivedAt: data.receivedAt ?? new Date(), notes: data.notes ?? null, idempotencyKey: data.idempotencyKey,
           createdByUserId: actorId, status: "POSTED",
           items: { create: receiptLines.map((line) => ({
@@ -402,7 +407,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
           if (number(item.deliveredQuantity) + pending + line.quantity > number(item.quantity) + 0.000001) throw new Error("DELIVERY_EXCEEDS_ORDERED");
         }
         const delivery = await tx.delivery.create({ data: {
-          tenantId, orderId: order.id, deliveryNumber: await nextNumber(tenantId, "DO", "delivery"),
+          tenantId, orderId: order.id, deliveryNumber: nextNumber("DO"),
           scheduledAt: data.scheduledAt ?? null, assignedUserId: data.assignedUserId ?? null,
           idempotencyKey: data.idempotencyKey, createdByUserId: actorId, status: "PENDING",
           items: { create: data.items.map((line: {orderItemId: string;quantity: number}) => {
@@ -438,7 +443,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
           if (allocation.amount > balance + 0.005) throw new Error("ALLOCATION_EXCEEDS_BALANCE");
         }
         const receipt = await tx.customerReceipt.create({ data: {
-          tenantId, customerId: customer.id, receiptNumber: await nextNumber(tenantId, "CR", "customerReceipt"),
+          tenantId, customerId: customer.id, receiptNumber: nextNumber("CR"),
           amount: data.amount, method: data.method, reference: data.reference ?? null, receivedAt: data.receivedAt ?? new Date(),
           status: "POSTED", notes: data.notes ?? null, idempotencyKey: data.idempotencyKey, createdByUserId: actorId,
           allocations: { create: data.allocations.map((entry: {invoiceId: string;amount: number}) => ({ invoiceId: entry.invoiceId, amount: entry.amount })) },
@@ -575,7 +580,9 @@ export async function POST(request: Request, context: { params: Promise<{ resour
       const permission = permissionSchema.safeParse(data);
       if (!permission.success) return fail(permission.error.issues[0]?.message || "Invalid permission.");
       const saved = await db.rolePermission.upsert({
-        where: { tenantId_role_moduleKey_actionKey: { tenantId, ...permission.data } as never },
+        where: { tenantId_role_moduleKey_actionKey: {
+          tenantId, role: permission.data.role, moduleKey: permission.data.moduleKey, actionKey: permission.data.actionKey,
+        } },
         create: { tenantId, ...permission.data, updatedByUserId: actorId },
         update: { granted: permission.data.granted, updatedByUserId: actorId },
       });
