@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
+import { invoiceStatusFromBalance } from "@/lib/operations/finance";
 import { requireWorkspaceAccess, writeAuditEvent } from "@/lib/crm/access";
 import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { db } from "@/lib/db";
@@ -53,15 +54,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
           .filter((entry) => entry.receipt.status === "POSTED")
           .reduce((sum, entry) => sum + Number(entry.amount), 0);
         const paidAfter = legacyPaid + allocatedPaid;
-        const nextStatus = paidAfter + 0.005 >= Number(payment.invoice.total)
-          ? "PAID"
-          : paidAfter > 0
-            ? "PARTIALLY_PAID"
-            : payment.invoice.status === "DRAFT"
-              ? "DRAFT"
-              : payment.invoice.dueDate < new Date()
-                ? "OVERDUE"
-                : "SENT";
+        const nextStatus = invoiceStatusFromBalance({
+          total: payment.invoice.total,
+          paid: paidAfter,
+          dueDate: payment.invoice.dueDate,
+          wasDraft: payment.invoice.status === "DRAFT",
+        });
         await tx.invoice.update({ where: { id: payment.invoiceId }, data: { status: nextStatus } });
         await tx.ledgerEntry.create({
           data: {
