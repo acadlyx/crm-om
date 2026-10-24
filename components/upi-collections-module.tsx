@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import QRCode from "qrcode";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import {
@@ -421,7 +422,7 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
               <td>{row.utr || "—"}</td>
               <td>{dateTime(row.paidAt)}</td>
               <td><span className={"crm-pill " + (row.status === "PAID" ? "crm-pill-active" : ["FAILED", "EXPIRED"].includes(row.status) ? "crm-pill-overdue" : "")}>{row.status}</span></td>
-              <td>{row.paymentId ? <a className="dashboard-text-link" href="/crm/payments">Payment history</a> : row.receiptId ? <a className="dashboard-text-link" href="/operations/customer-receipts">Customer receipts</a> : "—"}</td>
+              <td>{row.paymentId ? <Link className="dashboard-text-link" href="/crm/payments">Payment history</Link> : row.receiptId ? <Link className="dashboard-text-link" href="/operations/customer-receipts">Customer receipts</Link> : "—"}</td>
               <td><div className="operations-row-actions">
                 {row.status === "PENDING" && <>
                   <button type="button" className="crm-secondary-button" onClick={() => void makeQrFromRow(row)}><QrCode size={13} />View QR</button>
