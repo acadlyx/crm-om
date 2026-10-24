@@ -43,7 +43,7 @@ export function AppSidebar({ branding, role, tenantId }: { branding: Branding; r
             <p className="sidebar-section-label">SALES & FULFILMENT</p>
             {canSales && <Link className="sidebar-link" href="/operations/sales-orders"><ShoppingCart size={17} aria-hidden="true" />Orders & sales</Link>}
             {canDelivery && <Link className="sidebar-link" href="/operations/deliveries"><Truck size={17} aria-hidden="true" />Deliveries</Link>}
-            {canSales && <Link className="sidebar-link" href="/crm/invoices"><FileText size={17} aria-hidden="true" />Customer invoices</Link>}
+            {(canSales || canCollections || canFinance) && <Link className="sidebar-link" href="/crm/invoices"><FileText size={17} aria-hidden="true" />Customer invoices</Link>}
           </>}
 
           {(canInventory || canSupplierPurchases) && <>
