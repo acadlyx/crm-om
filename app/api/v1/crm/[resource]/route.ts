@@ -49,6 +49,7 @@ const validators = {
     subtotal: positiveMoney,
     taxAmount: optionalMoney,
     notes: optionalText,
+    idempotencyKey: z.string().trim().min(8).max(160),
   }),
   payments: z.object({
     invoiceId: z.string().uuid(),
@@ -203,10 +204,15 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         const total = Math.round((subtotal + taxAmount + Number.EPSILON) * 100) / 100;
         const invoiceNumber = "INV-" + issueDate.toISOString().slice(0, 10).replace(/-/g, "") + "-" + crypto.randomUUID().slice(0, 6).toUpperCase();
         const result = await db.$transaction(async (tx) => {
+          const existing = await tx.invoice.findUnique({
+            where: { tenantId_idempotencyKey: { tenantId, idempotencyKey: data.idempotencyKey } },
+            select: { id: true },
+          });
+          if (existing) return { invoice: existing, replay: true as const };
           const customer = await tx.customer.findFirst({ where: { id: data.customerId, tenantId }, select: { id: true } });
           if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
           const invoice = await tx.invoice.create({
-            data: { tenantId, customerId: data.customerId, invoiceNumber, issueDate, dueDate, subtotal, taxAmount, total, status: "SENT", notes: data.notes ?? null },
+            data: { tenantId, customerId: data.customerId, invoiceNumber, issueDate, dueDate, subtotal, taxAmount, total, status: "SENT", notes: data.notes ?? null, idempotencyKey: data.idempotencyKey },
             select: { id: true },
           });
           await tx.ledgerEntry.create({ data: {
@@ -214,9 +220,10 @@ export async function POST(request: Request, context: { params: Promise<{ resour
             description: "Sales invoice " + invoiceNumber, debit: total, credit: 0, idempotencyKey: "invoice-" + invoice.id, createdByUserId: access.user.id,
           } });
           await tx.auditLog.create({ data: { actorUserId: access.user.id, action: "CREATE", entityType: "INVOICE", entityId: invoice.id, metadata: { invoiceNumber, total } } });
-          return invoice;
+          return { invoice, replay: false as const };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-        created = result;
+        created = result.invoice;
+        idempotentReplay = result.replay;
         auditRecorded = true;
         break;
       }
