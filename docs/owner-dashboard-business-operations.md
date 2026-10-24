@@ -59,3 +59,12 @@ The following require additional configuration or implementation before calling 
 - Production backup/restore and recovery have not been verified by this change.
 
 No production migration has been run as part of this branch.
+
+
+## Additional finance integrity coverage
+
+- Existing `/api/v1/crm` invoice/payment paths now include receipt allocations and ignore reversed legacy payments when calculating outstanding balances.
+- Legacy invoice creation records the receivable and audit event transactionally; legacy payments post an associated customer-ledger credit.
+- Posted legacy payments can be reversed by the owner with a mandatory reason. The reversal changes status, recomputes invoice state, adds an opposite ledger entry and retains audit history.
+- The invoice print view shows the saved invoice lines, payments and allocated receipts; its print action uses the browser print dialog for PDF saving.
+- Pure finance calculation tests cover posted/reversed payment filtering, allocation totals, no-negative balances, invoice-state recalculation and due-ageing buckets.
