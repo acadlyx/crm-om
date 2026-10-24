@@ -130,6 +130,7 @@ model User {
   tenant        Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   notifications SystemNotification[]
   assignedDeliveries Delivery[] @relation("DeliveryAssignee")
+  assignedFollowUps CustomerFollowUp[] @relation("FollowUpAssignee")
   createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -820,6 +821,7 @@ model CustomerFollowUp {
   channel         String?        @db.VarChar(40)
   notes           String?        @db.Text
   assignedUserId  String?        @map("assigned_user_id") @db.Uuid
+  assignedUser    User?          @relation("FollowUpAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
   idempotencyKey  String?        @map("idempotency_key") @db.VarChar(160)
   createdByUserId String?        @map("created_by_user_id") @db.Uuid
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
