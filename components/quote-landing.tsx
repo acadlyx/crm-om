@@ -30,8 +30,11 @@ export function QuoteLanding() {
 
   useEffect(() => {
     // Randomize after hydration so server HTML and the first client render match.
-    setQuoteIndex(Math.floor(Math.random() * quotes.length));
-    setDesignIndex(Math.floor(Math.random() * designs.length));
+    const frame = window.requestAnimationFrame(() => {
+      setQuoteIndex(Math.floor(Math.random() * quotes.length));
+      setDesignIndex(Math.floor(Math.random() * designs.length));
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
