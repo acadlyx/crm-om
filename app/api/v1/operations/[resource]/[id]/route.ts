@@ -180,6 +180,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
           },
           select: { id: true, invoiceNumber: true, total: true, status: true },
         });
+        await tx.ledgerEntry.create({ data: {
+          tenantId, customerId: order.customerId, entryType: "SALES_INVOICE",
+          referenceType: "INVOICE", referenceId: invoice.id,
+          description: "Sales invoice " + invoice.invoiceNumber + " from order " + order.orderNumber,
+          debit: invoice.total, credit: 0, idempotencyKey: "invoice-" + invoice.id, createdByUserId: actorId,
+        } });
         await audit(tx, actorId, "SALES_ORDER_INVOICE_ISSUED", "Invoice", invoice.id, {
           salesOrderId: order.id,
           orderNumber: order.orderNumber,
