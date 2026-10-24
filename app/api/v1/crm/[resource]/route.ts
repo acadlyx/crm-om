@@ -21,6 +21,9 @@ const validators = {
     company: optionalText,
     email: optionalEmail,
     phone: optionalText,
+    address: optionalText,
+    creditLimit: optionalMoney,
+    paymentTermsDays: z.preprocess(blankToUndefined, z.coerce.number().int().min(0).max(365).optional()),
     notes: optionalText,
   }),
   leads: z.object({
@@ -171,7 +174,14 @@ export async function POST(request: Request, context: { params: Promise<{ resour
     switch (resource) {
       case "customers":
         created = await db.customer.create({
-          data: { tenantId, name: data.name, company: data.company ?? null, email: data.email?.toLowerCase() ?? null, phone: data.phone ?? null, notes: data.notes ?? null },
+          data: {
+            tenantId, name: data.name, company: data.company ?? null,
+            email: data.email?.toLowerCase() ?? null, phone: data.phone ?? null,
+            addresses: data.address ? [data.address] : [],
+            creditLimit: data.creditLimit ?? 0,
+            paymentTermsDays: data.paymentTermsDays ?? 0,
+            notes: data.notes ?? null,
+          },
           select: { id: true },
         });
         break;
