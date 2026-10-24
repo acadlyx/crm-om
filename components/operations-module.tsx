@@ -110,12 +110,12 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
   const [editingOrder, setEditingOrder] = useState<Row | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const [orderLines, setOrderLines] = useState([{ productId: "", quantity: "1", discountPercent: "0", taxPercent: "0" }]);
+  const [orderLines, setOrderLines] = useState<SalesLine[]>([{ productId: "", quantity: "1", discountPercent: "0", taxPercent: "0" }]);
   const [purchaseLines, setPurchaseLines] = useState([{ productId: "", quantity: "1" }]);
   const [receiptLines, setReceiptLines] = useState([{ purchaseOrderItemId: "", quantity: "1", unitCost: "" }]);
   const [deliveryLines, setDeliveryLines] = useState([{ orderItemId: "", quantity: "1" }]);
-  const [allocations, setAllocations] = useState([{ invoiceId: "", amount: "" }]);
-  const [supplierAllocations, setSupplierAllocations] = useState([{ billId: "", amount: "" }]);
+  const [allocations, setAllocations] = useState<Allocation[]>([{ invoiceId: "", amount: "" }]);
+  const [supplierAllocations, setSupplierAllocations] = useState<Allocation[]>([{ billId: "", amount: "" }]);
   const [selectedOrderId, setSelectedOrderId] = useState("");
 
   const loadRows = useCallback(async () => {
