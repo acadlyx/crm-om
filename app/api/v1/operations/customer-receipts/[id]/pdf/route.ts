@@ -133,7 +133,6 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   if (!access.ok) return Response.json({ error: { message: access.message } }, { status: access.status });
 
   const permission = await requireWorkspacePermission(access, "customer-receipts", "read");
-  const platformBranding = await getPlatformBranding();
   if (!permission.ok) return Response.json({ error: { message: permission.message } }, { status: permission.status });
   const platformBranding = await getPlatformBranding();
 
