@@ -81,7 +81,7 @@ export default async function WorkspacesPage() {
                   <td>{new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(tenant.createdAt)}</td>
                 </tr>)}</tbody>
               </table></div>
-            ) : <div className="dashboard-empty"><span className="dashboard-empty-icon"><Building2 size={20} /></span><strong>No business workspaces yet</strong><p>Create the first workspace above. Its owner will get a separate business CRM account.</p></div>}
+            ) : <div className="dashboard-empty"><span className="dashboard-empty-icon"><Building2 size={20} /></span><strong>No business workspaces yet</strong><p>Create the first workspace above. Its owner will receive a separate workspace and login.</p></div>}
           </section>
         </>
       )}
