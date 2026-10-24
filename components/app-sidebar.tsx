@@ -2,8 +2,8 @@ import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import type { Branding } from "@/lib/branding/defaults";
 import {
-  Activity, Bell, Building2, CheckSquare, CircleDollarSign, ContactRound,
-  FileText, Gauge, HandCoins, KanbanSquare, Palette, Users, Wallet,
+  Activity, Bell, Building2, CheckSquare, FileText, Gauge, HandCoins,
+  ContactRound, KanbanSquare, Palette, Users, Wallet,
 } from "lucide-react";
 
 export function AppSidebar({ branding, role }: { branding: Branding; role: string }) {

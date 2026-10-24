@@ -51,7 +51,7 @@ function display(value: unknown, key: string) {
 }
 
 export function CrmModule({
-  resource, title, description, fields, columns, initialRows, workflow,
+  resource, title, description, fields, columns, initialRows, workflow, recordLabel,
 }: {
   resource: string;
   title: string;
@@ -60,6 +60,7 @@ export function CrmModule({
   columns: CrmColumn[];
   initialRows: CrmRow[];
   workflow?: Workflow;
+  recordLabel?: string;
 }) {
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
@@ -134,7 +135,7 @@ export function CrmModule({
       <header className="crm-module-heading">
         <div><p className="dashboard-eyebrow">BUSINESS WORKSPACE</p><h1>{title}</h1><p className="dashboard-subtitle">{description}</p></div>
         <button type="button" className="brand-button crm-add-button" onClick={() => { setOpen((value) => !value); setError(""); setNotice(""); }}>
-          {open ? <X size={17} /> : <Plus size={17} />}{open ? "Close form" : "Add " + title.replace(/s$/, "")}
+          {open ? <X size={17} /> : <Plus size={17} />}{open ? "Close form" : "Add " + (recordLabel || title.replace(/s$/, ""))}
         </button>
       </header>
 
