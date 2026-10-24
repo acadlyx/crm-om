@@ -7,9 +7,12 @@ import { requireWorkspacePermission } from "@/lib/operations/permissions";
 const blank = (v: unknown) => v === "" || v === null ? undefined : v;
 const maybeText = z.preprocess(blank, z.string().trim().max(2000).optional());
 const maybeDate = z.preprocess(blank, z.coerce.date().optional());
-const money = z.coerce.number().finite().min(0).max(9999999999);
-const positiveMoney = z.coerce.number().finite().positive().max(9999999999);
-const quantity = z.coerce.number().finite().positive().max(1000000000);
+const hasCents = (value: number) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7;
+const hasThousandths = (value: number) => Math.abs(value * 1000 - Math.round(value * 1000)) < 1e-7;
+const money = z.coerce.number().finite().min(0).max(9999999999).refine(hasCents, "Currency amounts may have at most two decimal places.");
+const positiveMoney = z.coerce.number().finite().positive().max(9999999999).refine(hasCents, "Currency amounts may have at most two decimal places.");
+const stockQuantity = z.coerce.number().finite().min(0).max(1000000000).refine(hasThousandths, "Stock quantities may have at most three decimal places.");
+const quantity = z.coerce.number().finite().positive().max(1000000000).refine(hasThousandths, "Quantities may have at most three decimal places.");
 const method = z.enum(["CASH", "BANK_TRANSFER", "CARD", "UPI", "CHEQUE", "OTHER"]);
 const inventoryType = z.enum(["ADJUSTMENT_IN", "ADJUSTMENT_OUT", "DAMAGE", "LOSS", "SALE_RETURN", "PURCHASE_RETURN"]);
 const itemInput = z.object({
@@ -31,8 +34,8 @@ const validators = {
     description: maybeText,
     purchaseCost: money.optional().default(0),
     sellingPrice: money.optional().default(0),
-    initialStock: money.optional().default(0),
-    reorderLevel: money.optional().default(0),
+    initialStock: stockQuantity.optional().default(0),
+    reorderLevel: stockQuantity.optional().default(0),
   }).strict(),
   suppliers: z.object({
     name: z.string().trim().min(1).max(160),
