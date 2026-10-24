@@ -4,6 +4,7 @@ import { invoiceStatusFromBalance } from "@/lib/operations/finance";
 import { requireWorkspaceAccess, writeAuditEvent } from "@/lib/crm/access";
 import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { db } from "@/lib/db";
+import { isSameOriginRequest } from "@/lib/security/http";
 
 export async function PATCH(request: Request, context: { params: Promise<{ resource: string; id: string }> }) {
   const access = await requireWorkspaceAccess();
@@ -182,5 +183,98 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
     const known = error as { code?: string };
     console.error("CRM update failed:", resource, known?.code || "UNKNOWN");
     return Response.json({ error: { message: "Could not update this record." } }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request, context: { params: Promise<{ resource: string; id: string }> }) {
+  const fail = (status: number, message: string) =>
+    Response.json({ error: { message } }, { status, headers: { "Cache-Control": "private, no-store" } });
+  if (!isSameOriginRequest(request)) return fail(403, "Cross-origin changes are not allowed.");
+
+  const access = await requireWorkspaceAccess();
+  if (!access.ok) return fail(access.status, access.message);
+  const { resource, id } = await context.params;
+  if (!z.string().uuid().safeParse(id).success) return fail(400, "Invalid record identifier.");
+
+  const permission = await requireWorkspacePermission(access, resource, "delete");
+  if (!permission.ok) return fail(permission.status, permission.message);
+
+  const supported = new Set(["leads", "deals", "customers", "invoices", "payments", "expenses", "tasks"]);
+  if (!supported.has(resource)) return fail(404, "Delete is not available for this record type.");
+
+  try {
+    const result = await db.$transaction(async (tx) => {
+      let entityType = resource.slice(0, -1).toUpperCase();
+      if (resource === "leads") {
+        const row = await tx.lead.findFirst({ where: { id, tenantId: access.tenantId }, include: { deals: { select: { id: true } } } });
+        if (!row) return { kind: "NOT_FOUND" as const };
+        if (row.status === "CONVERTED" || row.deals.length) return { kind: "IN_USE" as const, reason: "This lead has been converted or linked to a deal. Keep the history and update its status instead." };
+        await tx.lead.delete({ where: { id: row.id } });
+        entityType = "LEAD";
+      } else if (resource === "deals") {
+        const row = await tx.deal.findFirst({ where: { id, tenantId: access.tenantId }, select: { id: true, title: true, stage: true, value: true } });
+        if (!row) return { kind: "NOT_FOUND" as const };
+        await tx.deal.delete({ where: { id: row.id } });
+        entityType = "DEAL";
+      } else if (resource === "customers") {
+        const row = await tx.customer.findFirst({
+          where: { id, tenantId: access.tenantId },
+          include: { _count: { select: { invoices: true, orders: true, receipts: true, deals: true, tasks: true, followUps: true, ledgerEntries: true, upiCollections: true } } },
+        });
+        if (!row) return { kind: "NOT_FOUND" as const };
+        const related = Object.values(row._count).reduce((sum, count) => sum + count, 0);
+        if (related) return { kind: "IN_USE" as const, reason: "This customer has linked invoices, orders, receipts, tasks, ledger entries, or payment requests. Mark the customer inactive instead to preserve history." };
+        await tx.customer.delete({ where: { id: row.id } });
+        entityType = "CUSTOMER";
+      } else if (resource === "invoices") {
+        const row = await tx.invoice.findFirst({
+          where: { id, tenantId: access.tenantId },
+          include: { payments: { select: { id: true } }, receiptAllocations: { select: { id: true } } },
+        });
+        if (!row) return { kind: "NOT_FOUND" as const };
+        const ledger = await tx.ledgerEntry.findFirst({ where: { tenantId: access.tenantId, referenceType: "INVOICE", referenceId: row.id }, select: { id: true } });
+        if (row.status !== "DRAFT" || row.payments.length || row.receiptAllocations.length || ledger) {
+          return { kind: "IN_USE" as const, reason: "Invoices that have been issued, paid, allocated or posted to a ledger are retained for audit. Cancel or correct them through the approved financial workflow." };
+        }
+        await tx.invoice.delete({ where: { id: row.id } });
+        entityType = "INVOICE";
+      } else if (resource === "payments") {
+        const row = await tx.payment.findFirst({ where: { id, tenantId: access.tenantId }, select: { id: true } });
+        if (!row) return { kind: "NOT_FOUND" as const };
+        return { kind: "IN_USE" as const, reason: "Payment history is immutable. Use the audited Reverse payment action instead of deleting it." };
+      } else if (resource === "expenses") {
+        const row = await tx.expense.findFirst({ where: { id, tenantId: access.tenantId }, select: { id: true, status: true } });
+        if (!row) return { kind: "NOT_FOUND" as const };
+        if (row.status !== "PLANNED") return { kind: "IN_USE" as const, reason: "Paid expenses are financial history and cannot be deleted. Keep the record for audit." };
+        await tx.expense.delete({ where: { id: row.id } });
+        entityType = "EXPENSE";
+      } else if (resource === "tasks") {
+        const row = await tx.task.findFirst({ where: { id, tenantId: access.tenantId }, select: { id: true } });
+        if (!row) return { kind: "NOT_FOUND" as const };
+        await tx.task.delete({ where: { id: row.id } });
+        entityType = "TASK";
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: access.user.id,
+          action: "DELETE",
+          entityType,
+          entityId: id,
+          metadata: { tenantId: access.tenantId, workspaceScoped: true },
+        },
+      });
+      return { kind: "DELETED" as const };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    if (result.kind === "NOT_FOUND") return fail(404, "Record not found in this workspace.");
+    if (result.kind === "IN_USE") return fail(409, result.reason);
+    return Response.json({ data: { id, deleted: true } }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    const code = (error as { code?: string })?.code;
+    if (code === "P2003" || code === "P2014") return fail(409, "This record is linked to existing business history and cannot be deleted.");
+    if (code === "P2034") return fail(409, "Another transaction changed this record. Refresh the list and retry.");
+    console.error("CRM delete failed.", resource, code || "UNKNOWN");
+    return fail(500, "Could not delete the record. No intentional data change was made; refresh and retry.");
   }
 }
