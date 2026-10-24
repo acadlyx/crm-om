@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, CheckCircle2, CircleAlert, LoaderCircle, ShieldCheck } from "lucide-react";
+import { PasswordInput } from "@/components/password-input";
 
 type CurrentAccount = { name: string; email: string; hasWorkspace: boolean };
 
@@ -72,7 +73,7 @@ export function WorkspaceForm({ currentAccount }: { currentAccount: CurrentAccou
         {!useCurrentAccount && <>
           <label className="field"><span>Owner full name *</span><input name="ownerName" required minLength={2} maxLength={160} placeholder="Business owner" /></label>
           <label className="field"><span>Owner email *</span><input name="ownerEmail" type="email" required maxLength={320} placeholder="owner@business.com" /></label>
-          <label className="field workspace-form-wide"><span>Initial owner password *</span><input name="ownerPassword" type="password" required minLength={12} maxLength={200} autoComplete="new-password" placeholder="At least 12 characters" /><small>Share this securely with the owner. It is stored as a password hash.</small></label>
+          <label className="field workspace-form-wide"><span>Initial owner password *</span><PasswordInput name="ownerPassword" required minLength={12} maxLength={200} autoComplete="new-password" placeholder="At least 12 characters" /><small>Share this securely with the owner. It is stored as a password hash.</small></label>
         </>}
         <label className="field"><span>Business phone</span><input name="contactPhone" type="tel" maxLength={40} placeholder="+91 ..." /></label>
         <label className="field workspace-form-wide"><span>Business address</span><textarea name="address" rows={2} maxLength={1000} placeholder="Optional registered or billing address" /></label>
