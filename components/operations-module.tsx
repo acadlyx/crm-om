@@ -99,7 +99,7 @@ function titleCase(value: string) {
 }
 function idempotencyKey() { return crypto.randomUUID(); }
 
-export function OperationsModule({ resource, owner }: { resource: string; owner: boolean }) {
+export function OperationsModule({ resource, owner, canUpdate = false }: { resource: string; owner: boolean; canUpdate?: boolean }) {
   const config = moduleConfig[resource];
   const [rows, setRows] = useState<Row[]>([]);
   const [catalogs, setCatalogs] = useState<Catalogs>(defaultCatalogs);
@@ -110,6 +110,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
   const [visibleCount, setVisibleCount] = useState(3);
   const [formOpen, setFormOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Row | null>(null);
+  const [editingMaster, setEditingMaster] = useState<Row | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [orderLines, setOrderLines] = useState<SalesLine[]>([{ productId: "", quantity: "1", discountPercent: "0", taxPercent: "0" }]);
@@ -252,8 +253,9 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
       payload = { ...raw, granted: raw.granted === "true" };
     }
 
+    const editingMasterRecord = !!editingMaster && (resource === "products" || resource === "suppliers");
     const editingDraftOrder = resource === "sales-orders" && editingOrder !== null;
-    const requestPayload: Record<string, unknown> = editingDraftOrder ? {
+    let requestPayload: Record<string, unknown> = editingDraftOrder ? {
       action: "EDIT_DRAFT",
       customerId: payload.customerId,
       orderDate: payload.orderDate || undefined,
@@ -261,6 +263,25 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
       notes: payload.notes || null,
       items: payload.items,
     } : payload;
+    if (editingMasterRecord) {
+      requestPayload = resource === "products" ? {
+        name: raw.name,
+        category: raw.category || null,
+        description: raw.description || null,
+        sellingPrice: Number(raw.sellingPrice || 0),
+        reorderLevel: Number(raw.reorderLevel || 0),
+        ...(Object.prototype.hasOwnProperty.call(raw, "purchaseCost") ? { purchaseCost: Number(raw.purchaseCost || 0) } : {}),
+      } : {
+        name: raw.name,
+        company: raw.company || null,
+        email: raw.email || null,
+        phone: raw.phone || null,
+        address: raw.address || null,
+        taxId: raw.taxId || null,
+        paymentTermsDays: Number(raw.paymentTermsDays || 0),
+        status: raw.status || editingMaster.status,
+      };
+    }
 
     try {
       if ((resource === "sales-orders" && !(payload.items as unknown[]).length)
@@ -271,19 +292,25 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
       }
       if (resource === "goods-receipts" && !selectedOrderId) throw new Error("Choose a purchase order first.");
       if (resource === "deliveries" && !selectedOrderId) throw new Error("Choose a sales order first.");
-      const endpoint = editingDraftOrder
-        ? "/api/v1/operations/sales-orders/" + encodeURIComponent(editingOrder!.id)
-        : "/api/v1/operations/" + resource;
+      const endpoint = editingMasterRecord
+        ? "/api/v1/operations/" + resource + "/" + encodeURIComponent(editingMaster!.id)
+        : editingDraftOrder
+          ? "/api/v1/operations/sales-orders/" + encodeURIComponent(editingOrder!.id)
+          : "/api/v1/operations/" + resource;
       const response = await fetch(endpoint, {
-        method: editingDraftOrder ? "PATCH" : "POST",
+        method: editingMasterRecord || editingDraftOrder ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(requestPayload),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result?.error?.message || "Could not save this record.");
-      setNotice(editingDraftOrder ? "Draft order updated and totals recalculated." : result.idempotentReplay ? "This request was already processed; no duplicate transaction was created." : "Saved successfully.");
+      setNotice(editingMasterRecord
+        ? "Record updated. Existing stock quantities and transaction history were preserved."
+        : editingDraftOrder ? "Draft order updated and totals recalculated."
+          : result.idempotentReplay ? "This request was already processed; no duplicate transaction was created." : "Saved successfully.");
       form.reset();
       if (editingDraftOrder) { setEditingOrder(null); setFormOpen(false); }
+      if (editingMasterRecord) { setEditingMaster(null); setFormOpen(false); }
       setOrderLines([{ productId: "", quantity: "1", discountPercent: "0", taxPercent: "0" }]);
       setPurchaseLines([{ productId: "", quantity: "1" }]);
       setReceiptLines([{ purchaseOrderItemId: "", quantity: "1" }]);
