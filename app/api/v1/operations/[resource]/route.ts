@@ -495,18 +495,27 @@ export async function POST(request: Request, context: { params: Promise<{ resour
     }
 
     if (resource === "supplier-bills") {
-      const supplier = await db.supplier.findFirst({ where: { id: data.supplierId, tenantId } });
-      if (!supplier) return fail("Supplier not found in this workspace.", 404);
-      if (data.purchaseOrderId) {
-        const order = await db.purchaseOrder.findFirst({ where: { id: data.purchaseOrderId, tenantId, supplierId: supplier.id } });
-        if (!order) return fail("Purchase order must belong to the selected supplier and workspace.");
-      }
-      const bill = await db.supplierBill.create({ data: {
-        tenantId, supplierId: supplier.id, purchaseOrderId: data.purchaseOrderId ?? null, billNumber: data.billNumber,
-        issueDate: data.issueDate ?? new Date(), dueDate: data.dueDate, total: data.total, notes: data.notes ?? null, createdByUserId: actorId,
-      } });
-      await db.auditLog.create({ data: { actorUserId: actorId, action: "SUPPLIER_BILL_CREATED", entityType: "SupplierBill", entityId: bill.id } });
-      return Response.json({ data: serialise(bill) }, { status: 201 });
+      const result = await db.$transaction(async (tx) => {
+        const supplier = await tx.supplier.findFirst({ where: { id: data.supplierId, tenantId } });
+        if (!supplier) throw new Error("SUPPLIER_NOT_FOUND");
+        if (data.purchaseOrderId) {
+          const order = await tx.purchaseOrder.findFirst({ where: { id: data.purchaseOrderId, tenantId, supplierId: supplier.id } });
+          if (!order) throw new Error("PURCHASE_ORDER_SUPPLIER_MISMATCH");
+        }
+        const bill = await tx.supplierBill.create({ data: {
+          tenantId, supplierId: supplier.id, purchaseOrderId: data.purchaseOrderId ?? null, billNumber: data.billNumber,
+          issueDate: data.issueDate ?? new Date(), dueDate: data.dueDate, total: data.total, notes: data.notes ?? null, createdByUserId: actorId,
+        } });
+        await tx.ledgerEntry.create({ data: {
+          tenantId, supplierId: supplier.id, entryType: "SUPPLIER_BILL",
+          referenceType: "SUPPLIER_BILL", referenceId: bill.id,
+          description: "Supplier bill " + bill.billNumber,
+          debit: 0, credit: bill.total, idempotencyKey: "supplier-bill-" + bill.id, createdByUserId: actorId,
+        } });
+        await audit(tx, actorId, "SUPPLIER_BILL_CREATED", "SupplierBill", bill.id, { billNumber: bill.billNumber, total: data.total });
+        return bill;
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      return Response.json({ data: serialise(result) }, { status: 201 });
     }
 
     if (resource === "supplier-payments") {
@@ -640,6 +649,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
       ALLOCATION_EXCEEDS_BALANCE: [409, "An allocation exceeds the outstanding invoice or bill balance."],
       ALLOCATIONS_EXCEED_PAYMENT: [400, "Bill allocations cannot exceed the supplier payment amount."],
       BILL_NOT_FOUND: [404, "Supplier bill not found for this supplier."],
+      PURCHASE_ORDER_SUPPLIER_MISMATCH: [400, "Purchase order must belong to the selected supplier and workspace."],
       INSUFFICIENT_STOCK: [409, "Insufficient stock for this inventory adjustment."],
     };
     if (statusMap[message]) return fail(statusMap[message][1], statusMap[message][0]);
