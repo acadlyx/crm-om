@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { requireWorkspaceAccess } from "@/lib/crm/access";
 import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { customerCreditExposure } from "@/lib/operations/credit";
+import { invoiceStatusFromBalance } from "@/lib/operations/finance";
 
 const blank = (v: unknown) => v === "" || v === null ? undefined : v;
 const maybeText = z.preprocess(blank, z.string().trim().max(2000).optional());
@@ -506,7 +507,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
           const legacyPaid = invoice.payments.filter((payment) => payment.status === "POSTED").reduce((sum, payment) => sum + number(payment.amount), 0);
           const receiptsPaid = invoice.receiptAllocations.filter((entry) => entry.receipt.status === "POSTED").reduce((sum, entry) => sum + number(entry.amount), 0);
           const paidAfter = legacyPaid + receiptsPaid;
-          await tx.invoice.update({ where: { id: invoice.id }, data: { status: paidAfter + 0.005 >= number(invoice.total) ? "PAID" : "PARTIALLY_PAID" } });
+          await tx.invoice.update({ where: { id: invoice.id }, data: { status: invoiceStatusFromBalance({ total: invoice.total, paid: paidAfter, dueDate: invoice.dueDate, wasDraft: invoice.status === "DRAFT" }) } });
         }
         await tx.ledgerEntry.create({ data: {
           tenantId, customerId: customer.id, entryType: "CUSTOMER_RECEIPT",
