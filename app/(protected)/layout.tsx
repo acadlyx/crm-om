@@ -7,7 +7,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 export const dynamic = "force-dynamic";
 export default async function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email) redirect("/login");
+  if (!session?.user?.email) redirect("/logintoprivatecrmbysyzent7456");
   const brand = await getPlatformBranding();
   return <div className="shell">
     <AppSidebar branding={brand} role={session.user.role} tenantId={session.user.tenantId} />
