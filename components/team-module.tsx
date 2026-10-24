@@ -47,6 +47,8 @@ export function TeamModule() {
       setLoading(false);
     }
   }, []);
+  // Team list is fetched asynchronously; its state updates occur after the network response.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(); }, [load]);
 
   const filtered = useMemo(() => {
