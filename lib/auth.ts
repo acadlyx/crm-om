@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
-  pages: { signIn: "/login" },
+  pages: { signIn: "/logintoprivatecrmbysyzent7456" },
   providers: [CredentialsProvider({
     name: "Credentials", credentials: { email: {}, password: {} },
     async authorize(credentials) {
