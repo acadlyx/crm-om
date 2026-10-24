@@ -3,7 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowRight, ArrowUpRight, CheckCircle2, CircleAlert, LoaderCircle,
+  ArrowDownToLine, ArrowRight, ArrowUpRight, CheckCircle2, CircleAlert, LoaderCircle,
   Plus, Search, X,
 } from "lucide-react";
 
@@ -66,6 +66,7 @@ export function CrmModule({
   const [rows, setRows] = useState(initialRows);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(3);
   const [busy, setBusy] = useState(false);
   const [busyRow, setBusyRow] = useState("");
   const [error, setError] = useState("");
@@ -94,6 +95,8 @@ export function CrmModule({
       const result = await response.json();
       if (!response.ok) throw new Error(result?.error?.message || "Could not save this record.");
       setNotice("Saved successfully.");
+      if (result?.data?.id) setRows((current) => [result.data as CrmRow, ...current.filter((row) => row.id !== result.data.id)]);
+      setVisibleCount(3);
       form.reset();
       setOpen(false);
       router.refresh();
@@ -126,6 +129,21 @@ export function CrmModule({
     } finally {
       setBusyRow("");
     }
+  }
+
+  function exportCSV() {
+    const csvRows = [
+      columns.map((column) => column.label),
+      ...filteredRows.map((row) => columns.map((column) => String(row[column.key] ?? ""))),
+    ];
+    const csv = csvRows.map((line) => line.map((value) => '"' + value.replaceAll('"', '""') + '"').join(",")).join("\r\n");
+    const blob = new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = resource + "-" + new Date().toISOString().slice(0, 10) + ".csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -180,12 +198,15 @@ export function CrmModule({
       <section className="card crm-table-card">
         <div className="crm-table-toolbar">
           <div><p className="dashboard-eyebrow">YOUR RECORDS</p><h2>{rows.length} {rows.length === 1 ? "record" : "records"}</h2></div>
-          <label className="crm-search"><Search size={16} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={"Search " + title.toLowerCase()} aria-label={"Search " + title} /></label>
+          <div className="crm-table-toolbar-actions">
+            <label className="crm-search"><Search size={16} aria-hidden="true" /><input value={query} onChange={(event) => { setQuery(event.target.value); setVisibleCount(3); }} placeholder={"Search " + title.toLowerCase()} aria-label={"Search " + title} /></label>
+            <button type="button" className="crm-secondary-button" onClick={exportCSV} disabled={!filteredRows.length}><ArrowDownToLine size={15} />Export CSV</button>
+          </div>
         </div>
         {filteredRows.length ? (
           <div className="crm-table-wrap"><table className="crm-table">
             <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}{workflow && <th>{workflow.label}</th>}</tr></thead>
-            <tbody>{filteredRows.map((row) => (
+            <tbody>{filteredRows.slice(0, visibleCount).map((row) => (
               <tr key={row.id}>
                 {columns.map((column, index) => {
                   const value = row[column.key];
@@ -206,6 +227,11 @@ export function CrmModule({
             {!query && <button type="button" className="dashboard-text-link crm-empty-add" onClick={() => setOpen(true)}>Add your first record <ArrowRight size={15} /></button>}
           </div>
         )}
+        {filteredRows.length > 3 && <div className="operations-table-footer">
+          <span>Showing {Math.min(visibleCount, filteredRows.length)} of {filteredRows.length} matching records</span>
+          {visibleCount < filteredRows.length && <button type="button" className="crm-secondary-button" onClick={() => setVisibleCount((count) => Math.min(filteredRows.length, count + 20))}>Show more ({filteredRows.length - visibleCount} remaining) <ArrowRight size={14} /></button>}
+          {visibleCount > 3 && <button type="button" className="crm-secondary-button" onClick={() => setVisibleCount(3)}>Show fewer</button>}
+        </div>}
         <p className="crm-table-footnote"><ArrowUpRight size={13} />Records are isolated to your business workspace. No other company&apos;s data is shown.</p>
       </section>
     </div>
