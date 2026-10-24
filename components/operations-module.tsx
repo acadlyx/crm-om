@@ -248,6 +248,16 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
       payload = { ...raw, granted: raw.granted === "true" };
     }
 
+    const editingDraftOrder = resource === "sales-orders" && editingOrder !== null;
+    const requestPayload: Record<string, unknown> = editingDraftOrder ? {
+      action: "EDIT_DRAFT",
+      customerId: payload.customerId,
+      orderDate: payload.orderDate || undefined,
+      expectedDeliveryAt: payload.expectedDeliveryAt || undefined,
+      notes: payload.notes || null,
+      items: payload.items,
+    } : payload;
+
     try {
       if ((resource === "sales-orders" && !(payload.items as unknown[]).length)
         || (resource === "purchase-orders" && !(payload.items as unknown[]).length)
@@ -257,13 +267,19 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
       }
       if (resource === "goods-receipts" && !selectedOrderId) throw new Error("Choose a purchase order first.");
       if (resource === "deliveries" && !selectedOrderId) throw new Error("Choose a sales order first.");
-      const response = await fetch("/api/v1/operations/" + resource, {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+      const endpoint = editingDraftOrder
+        ? "/api/v1/operations/sales-orders/" + encodeURIComponent(editingOrder!.id)
+        : "/api/v1/operations/" + resource;
+      const response = await fetch(endpoint, {
+        method: editingDraftOrder ? "PATCH" : "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(requestPayload),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result?.error?.message || "Could not save this record.");
-      setNotice(result.idempotentReplay ? "This request was already processed; no duplicate transaction was created." : "Saved successfully.");
+      setNotice(editingDraftOrder ? "Draft order updated and totals recalculated." : result.idempotentReplay ? "This request was already processed; no duplicate transaction was created." : "Saved successfully.");
       form.reset();
+      if (editingDraftOrder) { setEditingOrder(null); setFormOpen(false); }
       setOrderLines([{ productId: "", quantity: "1", discountPercent: "0", taxPercent: "0" }]);
       setPurchaseLines([{ productId: "", quantity: "1" }]);
       setReceiptLines([{ purchaseOrderItemId: "", quantity: "1", unitCost: "" }]);
