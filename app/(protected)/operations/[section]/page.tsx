@@ -30,5 +30,6 @@ export default async function OperationsPage({ params }: { params: Promise<{ sec
   }
 
   const owner = access.user.role === "TENANT_ADMIN" || access.user.role === "PLATFORM_ADMIN";
-  return <OperationsModule resource={section} owner={owner} />;
+  const updatePermission = await requireWorkspacePermission(access, section, "update");
+  return <OperationsModule resource={section} owner={owner} canUpdate={updatePermission.ok} />;
 }
