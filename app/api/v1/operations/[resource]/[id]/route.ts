@@ -223,6 +223,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
         const order = await tx.salesOrder.findFirst({
           where: { id, tenantId },
           include: {
+            customer: { select: { id: true, status: true, paymentTermsDays: true, creditLimit: true } },
             invoices: { select: { id: true, status: true } },
             deliveries: { select: { status: true } },
           },
@@ -230,6 +231,22 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
         if (!order) return { kind: "NOT_FOUND" as const };
         if (order.status === "CANCELLED" || order.status === "DELIVERED" || order.status === "PARTIALLY_DELIVERED") return { kind: "INVALID_STATE" as const };
         if (parsed.data.status === "CONFIRMED" && order.status !== "DRAFT") return { kind: "INVALID_STATE" as const };
+        if (parsed.data.status === "CONFIRMED") {
+          if (order.customer.status !== "ACTIVE") return { kind: "CUSTOMER_NOT_ACTIVE" as const };
+          const businessSettings = await tx.businessSettings.findUnique({
+            where: { tenantId }, select: { defaultPaymentTermsDays: true },
+          });
+          const termsDays = order.customer.paymentTermsDays > 0
+            ? order.customer.paymentTermsDays
+            : businessSettings?.defaultPaymentTermsDays ?? 0;
+          const creditLimit = n(order.customer.creditLimit);
+          if (termsDays > 0 && creditLimit > 0) {
+            const currentExposure = await customerCreditExposure(tx, tenantId, order.customer.id, order.id);
+            if (currentExposure + n(order.total) > creditLimit + 0.005) {
+              return { kind: "CREDIT_LIMIT_EXCEEDED" as const, creditLimit, currentExposure };
+            }
+          }
+        }
         if (parsed.data.status === "CANCELLED" && order.invoices.some((invoice) => invoice.status !== "CANCELLED")) return { kind: "INVOICED" as const };
         if (parsed.data.status === "CANCELLED" && order.deliveries.some((delivery) => ["DELIVERED", "PARTIALLY_DELIVERED"].includes(delivery.status))) return { kind: "HAS_DELIVERIES" as const };
         if (parsed.data.status === "CANCELLED") {
@@ -245,6 +262,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
       if (result.kind === "NOT_FOUND") return fail("Sales order not found in this workspace.", 404);
       if (result.kind === "INVOICED") return fail("An order with an issued invoice cannot be cancelled. Reverse or credit the invoice using an authorized financial workflow.", 409);
       if (result.kind === "HAS_DELIVERIES") return fail("An order with completed or partially completed deliveries cannot be cancelled. Use a return workflow.", 409);
+       if (result.kind === "CUSTOMER_NOT_ACTIVE") return fail("An inactive customer cannot have a new confirmed order.", 409);
+       if (result.kind === "CREDIT_LIMIT_EXCEEDED") return fail("Order not confirmed: current credit exposure " + n(result.currentExposure).toFixed(2) + " plus this order exceeds the customer credit limit of " + n(result.creditLimit).toFixed(2) + ".", 409);
        if (result.kind === "INVALID_STATE") return fail("This order cannot make that status transition.", 409);
       return Response.json({ data: result.order });
     }
