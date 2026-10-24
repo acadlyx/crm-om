@@ -198,11 +198,16 @@ export async function POST(request: Request, context: { params: Promise<{ resour
       }
       case "invoices": {
         const issueDate = data.issueDate ?? new Date();
-        const dueDate = data.dueDate ?? new Date(issueDate.getTime() + 14 * 24 * 60 * 60 * 1000);
+        const settings = await db.businessSettings.findUnique({
+          where: { tenantId }, select: { invoicePrefix: true, defaultPaymentTermsDays: true },
+        });
+        const paymentTermsDays = settings?.defaultPaymentTermsDays ?? 0;
+        const dueDate = data.dueDate ?? new Date(issueDate.getTime() + paymentTermsDays * 24 * 60 * 60 * 1000);
         const subtotal = Number(data.subtotal);
         const taxAmount = Number(data.taxAmount ?? 0);
         const total = Math.round((subtotal + taxAmount + Number.EPSILON) * 100) / 100;
-        const invoiceNumber = "INV-" + issueDate.toISOString().slice(0, 10).replace(/-/g, "") + "-" + crypto.randomUUID().slice(0, 6).toUpperCase();
+        const prefix = settings?.invoicePrefix?.trim() || "INV";
+        const invoiceNumber = prefix + "-" + issueDate.toISOString().slice(0, 10).replace(/-/g, "") + "-" + crypto.randomUUID().slice(0, 6).toUpperCase();
         const result = await db.$transaction(async (tx) => {
           const existing = await tx.invoice.findUnique({
             where: { tenantId_idempotencyKey: { tenantId, idempotencyKey: data.idempotencyKey } },
