@@ -111,7 +111,7 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
         where: { tenantId, status: { in: ["PARTIALLY_DELIVERED", "DELIVERED"] }, completedAt: { gte: start, lte: end } },
         select: {
           id: true, deliveryNumber: true, completedAt: true,
-          order: { select: { orderNumber: true, customer: { select: { name: true } } } },
+          order: { select: { id: true, orderNumber: true, customer: { select: { id: true, name: true } } } },
           items: { select: {
             quantity: true, unitCost: true,
             product: { select: { name: true, sku: true, purchaseCost: true } },
@@ -167,7 +167,7 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
       }),
       db.inventoryMovement.findMany({
         where: { tenantId, createdAt: { gte: priorMonth }, movementType: { in: ["DAMAGE", "LOSS", "SALE_RETURN", "PURCHASE_RETURN"] } },
-        select: { id: true, movementType: true, quantity: true, createdAt: true, notes: true, product: { select: { name: true, sku: true } } },
+        select: { id: true, movementType: true, quantity: true, createdAt: true, notes: true, product: { select: { name: true, sku: true, unit: true } } },
         orderBy: { createdAt: "desc" }, take: 300,
       }),
     ]);
@@ -235,16 +235,27 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
   const actionCount = overdue.length + dueSoonInvoices.length + followUps.length + tasks.length + overdueDeliveries.length + failedDeliveries.length + lowStock.length + delayedPOs.length + movements.length;
   const topProducts = new Map<string, { id: string; sku: string; name: string; value: number; quantity: number }>();
   const topCustomers = new Map<string, { id: string; name: string; value: number; orders: number }>();
-  for (const order of salesOrders) {
-    const customer = topCustomers.get(order.customer.id) || { id: order.customer.id, name: order.customer.name, value: 0, orders: 0 };
-    customer.value += number(order.total); customer.orders += 1; topCustomers.set(order.customer.id, customer);
-    for (const item of order.items) {
-      const entry = topProducts.get(item.productId) || { id: item.productId, sku: item.product.sku, name: item.product.name, value: 0, quantity: 0 };
-      const qty = number(item.deliveredQuantity);
+  const customerOrderIds = new Map<string, Set<string>>();
+  for (const delivery of periodDeliveries) {
+    const customerId = delivery.order.customer.id;
+    const customer = topCustomers.get(customerId) || { id: customerId, name: delivery.order.customer.name, value: 0, orders: 0 };
+    let orderIds = customerOrderIds.get(customerId);
+    if (!orderIds) { orderIds = new Set<string>(); customerOrderIds.set(customerId, orderIds); }
+    orderIds.add(delivery.order.id);
+    for (const item of delivery.items) {
+      const qty = number(item.quantity);
+      const lineRevenue = qty * number(item.orderItem.unitPrice)
+        - number(item.orderItem.discountAmount) * qty / Math.max(number(item.orderItem.quantity), 0.000001);
+      const sku = item.product.sku;
+      const productName = item.product.name;
+      const entry = topProducts.get(item.productId) || { id: item.productId, sku, name: productName, value: 0, quantity: 0 };
       entry.quantity += qty;
-      entry.value += qty * number(item.unitPrice);
+      entry.value += lineRevenue;
       topProducts.set(item.productId, entry);
+      customer.value += lineRevenue;
     }
+    customer.orders = orderIds.size;
+    topCustomers.set(customerId, customer);
   }
   const bestProducts = [...topProducts.values()].sort((a, b) => b.value - a.value).slice(0, 5);
   const customerLeaders = [...topCustomers.values()].sort((a, b) => b.value - a.value).slice(0, 5);
@@ -364,6 +375,9 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
             </section>
             <section><div className="owner-action-heading"><Truck size={15} /><strong>Delayed deliveries</strong><span>{overdueDeliveries.length}</span></div>
               <ShowMoreList items={overdueDeliveries} empty="No delayed deliveries." renderItem={(item) => <Link className="owner-action-row" href="/operations/deliveries"><span><strong>{item.deliveryNumber} · {item.order.customer.name}</strong><small>{item.status} · Scheduled {item.scheduledAt ? dateLabel(item.scheduledAt) : "not set"}</small></span><ArrowRight size={15} /></Link>} />
+            </section>
+            <section><div className="owner-action-heading"><AlertCircle size={15} /><strong>Failed deliveries</strong><span>{failedDeliveries.length}</span></div>
+              <ShowMoreList items={failedDeliveries} empty="No failed deliveries recorded." renderItem={(item) => <Link className="owner-action-row" href="/operations/deliveries"><span><strong>{item.deliveryNumber} · {item.order.customer.name}</strong><small>{item.failureReason || "Failure reason not recorded"}</small></span><ArrowRight size={15} /></Link>} />
             </section>
             <section><div className="owner-action-heading"><Package size={15} /><strong>Replenishment needed</strong><span>{lowStock.length}</span></div>
               <ShowMoreList items={lowStock} empty="All active products are above their reorder threshold." renderItem={(item) => <Link className="owner-action-row" href="/operations/products"><span><strong>{item.name} · {item.sku}</strong><small>Stock {number(item.stockOnHand)} {item.unit} · reorder at {number(item.reorderLevel)}</small></span><b>{number(item.stockOnHand) <= 0 ? "Out of stock" : "Low stock"}</b></Link>} />
