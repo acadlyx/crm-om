@@ -23,6 +23,7 @@ import {
 import { authOptions } from "@/lib/auth";
 import { getPlatformBranding } from "@/lib/branding/service";
 import { db } from "@/lib/db";
+import { OwnerDashboard } from "@/components/owner-dashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -41,12 +42,15 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(value);
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id || !session.user.email) redirect("/login");
+  if (!session?.user?.id || !session.user.email) redirect("/logintoprivatecrmbysyzent7456");
 
   const isPlatformAdmin = session.user.role === "PLATFORM_ADMIN";
   const tenantId = session.user.tenantId;
+  if (tenantId && (session.user.role === "TENANT_ADMIN" || isPlatformAdmin)) {
+    return <OwnerDashboard tenantId={tenantId} searchParams={searchParams ? await searchParams : {}} />;
+  }
   const activityWhere = isPlatformAdmin && !tenantId ? {} : { actorUserId: session.user.id };
 
   const [
