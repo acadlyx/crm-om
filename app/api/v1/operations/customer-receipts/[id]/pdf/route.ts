@@ -43,17 +43,27 @@ function asMoney(value: unknown, currency: string): string {
   }).format(Number.isFinite(amount) ? amount : 0).replace(/[\u00a0\u202f]/g, " ");
 }
 
-function fromHex(value: string): PDFColor {
+type RGBTriplet = { r: number; g: number; b: number };
+
+function fromHex(value: string): RGBTriplet {
   const hex = value.replace("#", "");
-  return rgb(parseInt(hex.slice(0, 2), 16) / 255, parseInt(hex.slice(2, 4), 16) / 255, parseInt(hex.slice(4, 6), 16) / 255);
+  return {
+    r: parseInt(hex.slice(0, 2), 16) / 255,
+    g: parseInt(hex.slice(2, 4), 16) / 255,
+    b: parseInt(hex.slice(4, 6), 16) / 255,
+  };
 }
 
-function tint(color: PDFColor, amount: number) {
-  return rgb(
-    color.red + (1 - color.red) * amount,
-    color.green + (1 - color.green) * amount,
-    color.blue + (1 - color.blue) * amount,
-  );
+function toPdfColor(color: RGBTriplet): PDFColor {
+  return rgb(color.r, color.g, color.b);
+}
+
+function tint(color: RGBTriplet, amount: number): RGBTriplet {
+  return {
+    r: color.r + (1 - color.r) * amount,
+    g: color.g + (1 - color.g) * amount,
+    b: color.b + (1 - color.b) * amount,
+  };
 }
 
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
@@ -166,7 +176,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     page.drawText("RECEIPT " + pdfText(receiptNumber) + " - CONTINUED", {
       x: MARGIN, y: y - 18, size: 8, font: normal, color: MUTED,
     });
-    page.drawLine({ start: { x: MARGIN, y: y - 28 }, end: { x: PAGE_WIDTH - MARGIN, y: y - 28 }, thickness: 1, color: accent });
+    page.drawLine({ start: { x: MARGIN, y: y - 28 }, end: { x: PAGE_WIDTH - MARGIN, y: y - 28 }, thickness: 1, color: toPdfColor(accent) });
     y -= 48;
   }
 
@@ -185,8 +195,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     });
   } else {
     const initials = businessName.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-    page.drawRectangle({ x: PAGE_WIDTH - MARGIN - 42, y: y - 38, width: 42, height: 42, color: tint(accent, 0.85), borderColor: tint(accent, 0.55), borderWidth: 0.8 });
-    page.drawText(pdfText(initials || "BC"), { x: PAGE_WIDTH - MARGIN - 34, y: y - 23, size: 13, font: bold, color: accent });
+    page.drawRectangle({ x: PAGE_WIDTH - MARGIN - 42, y: y - 38, width: 42, height: 42, color: toPdfColor(tint(accent, 0.85)), borderColor: toPdfColor(tint(accent, 0.55)), borderWidth: 0.8 });
+    page.drawText(pdfText(initials || "BC"), { x: PAGE_WIDTH - MARGIN - 34, y: y - 23, size: 13, font: bold, color: toPdfColor(accent) });
   }
 
   page.drawText(businessName, { x: MARGIN, y, size: 17, font: bold, color: BLACK, maxWidth: 390 });
@@ -196,15 +206,15 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   if (contact) businessY = drawWrapped(page, contact, MARGIN, businessY, 390, normal, 8, MUTED, 11, 2);
   y = Math.min(businessY - 12, y - 61);
 
-  page.drawLine({ start: { x: MARGIN, y }, end: { x: PAGE_WIDTH - MARGIN, y }, thickness: template.style === "minimal" ? 0.6 : 1.6, color: accent });
+  page.drawLine({ start: { x: MARGIN, y }, end: { x: PAGE_WIDTH - MARGIN, y }, thickness: template.style === "minimal" ? 0.6 : 1.6, color: toPdfColor(accent) });
   y -= 31;
 
   if (template.style === "modern") {
-    page.drawRectangle({ x: MARGIN, y: y - 8, width: PAGE_WIDTH - MARGIN * 2, height: 36, color: tint(accent, 0.88) });
-    page.drawText(pdfText(template.title), { x: MARGIN + 12, y: y + 4, size: 18, font: bold, color: accent });
+    page.drawRectangle({ x: MARGIN, y: y - 8, width: PAGE_WIDTH - MARGIN * 2, height: 36, color: toPdfColor(tint(accent, 0.88)) });
+    page.drawText(pdfText(template.title), { x: MARGIN + 12, y: y + 4, size: 18, font: bold, color: toPdfColor(accent) });
     y -= 44;
   } else {
-    page.drawText(pdfText(template.title), { x: MARGIN, y, size: 19, font: bold, color: template.style === "classic" ? accent : BLACK });
+    page.drawText(pdfText(template.title), { x: MARGIN, y, size: 19, font: bold, color: template.style === "classic" ? toPdfColor(accent) : BLACK });
     y -= 26;
   }
 
@@ -215,12 +225,12 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   }
 
   const amountCardHeight = 78;
-  page.drawRectangle({ x: MARGIN, y: y - amountCardHeight + 9, width: 236, height: amountCardHeight, color: tint(accent, 0.92), borderColor: tint(accent, 0.67), borderWidth: 0.8 });
+  page.drawRectangle({ x: MARGIN, y: y - amountCardHeight + 9, width: 236, height: amountCardHeight, color: toPdfColor(tint(accent, 0.92)), borderColor: toPdfColor(tint(accent, 0.67)), borderWidth: 0.8 });
   page.drawText("AMOUNT RECEIVED", { x: MARGIN + 14, y: y - 12, size: 8, font: bold, color: MUTED });
-  page.drawText(pdfText(asMoney(receipt.amount, settings?.currency || "INR")), { x: MARGIN + 14, y: y - 42, size: 19, font: bold, color: accent, maxWidth: 208 });
+  page.drawText(pdfText(asMoney(receipt.amount, settings?.currency || "INR")), { x: MARGIN + 14, y: y - 42, size: 19, font: bold, color: toPdfColor(accent), maxWidth: 208 });
   page.drawText("Receipt " + pdfText(receipt.receiptNumber), { x: MARGIN + 14, y: y - 59, size: 8.5, font: normal, color: MUTED });
   page.drawText("STATUS", { x: MARGIN + 260, y: y - 12, size: 8, font: bold, color: MUTED });
-  page.drawText(pdfText(receipt.status), { x: MARGIN + 260, y: y - 29, size: 11, font: bold, color: receipt.status === "REVERSED" ? DANGER : accent });
+  page.drawText(pdfText(receipt.status), { x: MARGIN + 260, y: y - 29, size: 11, font: bold, color: receipt.status === "REVERSED" ? DANGER : toPdfColor(accent) });
   page.drawText("DATE RECEIVED", { x: MARGIN + 260, y: y - 48, size: 8, font: bold, color: MUTED });
   page.drawText(new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: settings?.timezone || "Asia/Kolkata" }).format(receipt.receivedAt), {
     x: MARGIN + 260, y: y - 63, size: 10, font: normal, color: BLACK,
@@ -254,7 +264,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     ensureSpace(80);
     page.drawText("INVOICE ALLOCATION", { x: MARGIN, y, size: 10.5, font: bold, color: BLACK });
     y -= 19;
-    page.drawRectangle({ x: MARGIN, y: y - 6, width: PAGE_WIDTH - MARGIN * 2, height: 21, color: template.style === "minimal" ? PALE : tint(accent, 0.9) });
+    page.drawRectangle({ x: MARGIN, y: y - 6, width: PAGE_WIDTH - MARGIN * 2, height: 21, color: template.style === "minimal" ? PALE : toPdfColor(tint(accent, 0.9)) });
     page.drawText("INVOICE", { x: MARGIN + 9, y: y + 1, size: 8, font: bold, color: BLACK });
     page.drawText("AMOUNT ALLOCATED", { x: PAGE_WIDTH - MARGIN - 145, y: y + 1, size: 8, font: bold, color: BLACK });
     y -= 19;
