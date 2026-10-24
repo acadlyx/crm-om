@@ -30,11 +30,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
   try {
     if (resource === "products") {
       const parsed = z.object({
+        name: z.string().trim().min(1).max(200).optional(),
+        description: z.string().trim().max(4000).nullable().optional(),
         status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
         category: z.string().trim().max(120).nullable().optional(),
-        reorderLevel: z.coerce.number().finite().min(0).max(1000000000).optional(),
-        sellingPrice: z.coerce.number().finite().min(0).max(9999999999).optional(),
-        purchaseCost: z.coerce.number().finite().min(0).max(9999999999).optional(),
+        reorderLevel: z.coerce.number().finite().min(0).max(1000000000).refine((value) => Math.abs(value * 1000 - Math.round(value * 1000)) < 1e-7, "Stock quantities may have at most three decimal places.").optional(),
+        sellingPrice: z.coerce.number().finite().min(0).max(9999999999).refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7, "Currency amounts may have at most two decimal places.").optional(),
+        purchaseCost: z.coerce.number().finite().min(0).max(9999999999).refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7, "Currency amounts may have at most two decimal places.").optional(),
       }).strict().safeParse(body);
       if (!parsed.success || Object.keys(parsed.data).length === 0) return fail(parsed.success ? "No editable fields were supplied." : parsed.error.issues[0]?.message || "Invalid product update.");
       const result = await db.$transaction(async (tx) => {
