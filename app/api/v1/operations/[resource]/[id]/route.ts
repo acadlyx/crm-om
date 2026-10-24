@@ -37,9 +37,25 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
         purchaseCost: z.coerce.number().finite().min(0).max(9999999999).optional(),
       }).strict().safeParse(body);
       if (!parsed.success || Object.keys(parsed.data).length === 0) return fail(parsed.success ? "No editable fields were supplied." : parsed.error.issues[0]?.message || "Invalid product update.");
-      const updated = await db.product.updateMany({ where: { id, tenantId }, data: parsed.data });
-      if (!updated.count) return fail("Product not found in this workspace.", 404);
-      await writeAuditEvent({ actorUserId: actorId, action: "PRODUCT_UPDATED", entityType: "Product", entityId: id, metadata: parsed.data });
+      const result = await db.$transaction(async (tx) => {
+        const product = await tx.product.findFirst({
+          where: { id, tenantId },
+          select: { id: true, stockOnHand: true, purchaseCost: true },
+        });
+        if (!product) return "NOT_FOUND";
+        if (parsed.data.status === "INACTIVE" && n(product.stockOnHand) > 0) return "STOCK_REMAINS";
+        if (parsed.data.purchaseCost !== undefined
+          && Math.abs(n(product.purchaseCost) - parsed.data.purchaseCost) > 0.005
+          && n(product.stockOnHand) > 0) return "COST_LOCKED";
+        await tx.product.update({ where: { id: product.id }, data: parsed.data });
+        await tx.auditLog.create({
+          data: { actorUserId: actorId, action: "PRODUCT_UPDATED", entityType: "Product", entityId: id, metadata: parsed.data },
+        });
+        return "UPDATED";
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      if (result === "NOT_FOUND") return fail("Product not found in this workspace.", 404);
+      if (result === "STOCK_REMAINS") return fail("A product with remaining stock cannot be deactivated. Post the appropriate stock movements first.", 409);
+      if (result === "COST_LOCKED") return fail("Purchase cost cannot be edited while stock remains. Receive stock at its actual cost or post an authorized valuation adjustment.", 409);
       return Response.json({ data: { id, updated: true } });
     }
 
