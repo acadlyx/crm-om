@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb, type PDFImage, type PDFFont } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, type Color as PDFColor, type PDFImage, type PDFFont } from "pdf-lib";
 import { requireWorkspaceAccess } from "@/lib/crm/access";
 import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { db } from "@/lib/db";
@@ -11,7 +11,6 @@ const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
 const MARGIN = 46;
 
-type Color = { r: number; g: number; b: number };
 const BLACK = rgb(0.13, 0.17, 0.16);
 const MUTED = rgb(0.38, 0.43, 0.41);
 const LIGHT_BORDER = rgb(0.86, 0.89, 0.87);
@@ -44,16 +43,12 @@ function asMoney(value: unknown, currency: string): string {
   }).format(Number.isFinite(amount) ? amount : 0).replace(/[\u00a0\u202f]/g, " ");
 }
 
-function fromHex(value: string): Color {
+function fromHex(value: string): PDFColor {
   const hex = value.replace("#", "");
-  return {
-    r: parseInt(hex.slice(0, 2), 16) / 255,
-    g: parseInt(hex.slice(2, 4), 16) / 255,
-    b: parseInt(hex.slice(4, 6), 16) / 255,
-  };
+  return rgb(parseInt(hex.slice(0, 2), 16) / 255, parseInt(hex.slice(2, 4), 16) / 255, parseInt(hex.slice(4, 6), 16) / 255);
 }
 
-function tint(color: Color, amount: number) {
+function tint(color: PDFColor, amount: number) {
   return rgb(
     color.r + (1 - color.r) * amount,
     color.g + (1 - color.g) * amount,
@@ -143,6 +138,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     },
   });
   if (!receipt) return Response.json({ error: { message: "Receipt not found in this workspace." } }, { status: 404 });
+  const receiptNumber = receipt.receiptNumber;
 
   const settings = await db.businessSettings.findUnique({ where: { tenantId: access.tenantId } });
   const preferences = settings?.preferences && typeof settings.preferences === "object" && !Array.isArray(settings.preferences)
@@ -167,7 +163,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     y = PAGE_HEIGHT - 48;
     page.drawText(pdfText(settings?.businessName || "Business"), { x: MARGIN, y, size: 12, font: bold, color: BLACK });
-    page.drawText("RECEIPT " + pdfText(receipt.receiptNumber) + " - CONTINUED", {
+    page.drawText("RECEIPT " + pdfText(receiptNumber) + " - CONTINUED", {
       x: MARGIN, y: y - 18, size: 8, font: normal, color: MUTED,
     });
     page.drawLine({ start: { x: MARGIN, y: y - 28 }, end: { x: PAGE_WIDTH - MARGIN, y: y - 28 }, thickness: 1, color: accent });
