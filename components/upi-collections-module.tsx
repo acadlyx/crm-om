@@ -292,8 +292,8 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
       const matrix = parseCsv(await file.text());
       if (matrix.length < 2) throw new Error("The CSV must have a header row and at least one transaction row.");
       const headers = matrix[0];
-      const refIndex = firstIndex(headers, ["transactionref", "transactionreference", "merchantreference", "reference", "tr"]);
-      const utrIndex = firstIndex(headers, ["utr", "bankreference", "bankref", "rrn", "transactionid", "utrnumber"]);
+      const refIndex = firstIndex(headers, ["transactionref", "transactionreference", "merchantreference", "reference", "referenceid", "referenceno", "remarks", "description", "details", "purpose", "comments", "orderid", "tr", "txnid"]);
+      const utrIndex = firstIndex(headers, ["utr", "utrno", "utrnumber", "bankreference", "bankref", "bankutr", "rrn", "transactionid", "upirefno", "upireference", "txnref", "refno"]);
       const amountIndex = firstIndex(headers, ["amount", "credit", "creditedamount", "transactionamount"]);
       const dateIndex = firstIndex(headers, ["paidat", "date", "datetime", "transactiondate", "valuedate"]);
       if (refIndex < 0 || utrIndex < 0 || amountIndex < 0) {
@@ -327,7 +327,8 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
         }
       }
       await load();
-      const summary = "Statement processed: " + imported + " reconciled, " + (matched - imported - issues.length) + " unmatched/skipped, " + issues.length + " needing attention.";
+      const summary = "Statement processed: " + imported + " reconciled, " + skipped + " unmatched/skipped, " + issues.length + " needing attention.";
+      if (matched > imported + issues.length) skipped += matched - imported - issues.length;
       setNotice(issues.length ? summary + " First issue: " + issues[0] : summary);
       if (issues.length) setError("Some statement rows were not reconciled. Review the report and retry only after checking the bank history.");
       else if (!imported) setNotice("No payments matched pending QR references. Confirm the CSV columns and transaction references.");
