@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./quote-landing.css";
 
 const quotes = [
@@ -25,8 +25,17 @@ function differentIndex(current: number, length: number) {
 }
 
 export function QuoteLanding() {
-  const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * quotes.length));
-  const [designIndex, setDesignIndex] = useState(() => Math.floor(Math.random() * designs.length));
+  const [quoteIndex, setQuoteIndex] = useState(0);
+  const [designIndex, setDesignIndex] = useState(0);
+
+  useEffect(() => {
+    // Randomize after hydration so server HTML and the first client render match.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setQuoteIndex(Math.floor(Math.random() * quotes.length));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDesignIndex(Math.floor(Math.random() * designs.length));
+  }, []);
+
   const pointerStart = useRef<{ x: number; y: number } | null>(null);
   const suppressClick = useRef(false);
 
