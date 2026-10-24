@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 
-export type AppRole = "PLATFORM_ADMIN" | "TENANT_ADMIN" | "STAFF";
+export type AppRole = "PLATFORM_ADMIN" | "TENANT_ADMIN" | "STAFF" | "SALES" | "DELIVERY" | "COLLECTIONS" | "INVENTORY_MANAGER" | "ACCOUNTANT";
 
 export function canManagePlatformBranding(role: string | null | undefined): boolean {
   return role === "PLATFORM_ADMIN";
