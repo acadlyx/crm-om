@@ -90,13 +90,13 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
   const priorMonth = new Date(today); priorMonth.setDate(priorMonth.getDate() - 30);
 
   let datasets: {
-    salesOrders: any[]; periodInvoices: any[]; allInvoices: any[]; periodPayments: any[];
+    salesOrders: any[]; periodDeliveries: any[]; periodInvoices: any[]; allInvoices: any[]; periodPayments: any[];
     periodReceipts: any[]; products: any[]; pendingDeliveries: any[]; bills: any[];
     periodSupplierPayments: any[]; purchaseOrders: any[]; followUps: any[]; tasks: any[]; movements: any[];
   };
   try {
     const [
-      salesOrders, periodInvoices, allInvoices, periodPayments, periodReceipts, products,
+      salesOrders, periodDeliveries, periodInvoices, allInvoices, periodPayments, periodReceipts, products,
       pendingDeliveries, bills, periodSupplierPayments, purchaseOrders, followUps, tasks, movements,
     ] = await Promise.all([
       db.salesOrder.findMany({
@@ -106,6 +106,19 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
           items: { select: { productId: true, quantity: true, deliveredQuantity: true, unitPrice: true, unitCost: true, discountAmount: true, product: { select: { sku: true, name: true } } } },
         },
         orderBy: { orderDate: "desc" }, take: 5000,
+      }),
+      db.delivery.findMany({
+        where: { tenantId, status: { in: ["PARTIALLY_DELIVERED", "DELIVERED"] }, completedAt: { gte: start, lte: end } },
+        select: {
+          id: true, deliveryNumber: true, completedAt: true,
+          order: { select: { orderNumber: true, customer: { select: { name: true } } } },
+          items: { select: {
+            quantity: true, unitCost: true,
+            product: { select: { name: true, sku: true, purchaseCost: true } },
+            orderItem: { select: { quantity: true, unitPrice: true, discountAmount: true } },
+          } },
+        },
+        orderBy: { completedAt: "desc" }, take: 5000,
       }),
       db.invoice.findMany({
         where: { tenantId, salesOrderId: null, issueDate: { gte: start, lte: end }, status: { not: "CANCELLED" } },
@@ -158,7 +171,7 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
         orderBy: { createdAt: "desc" }, take: 300,
       }),
     ]);
-    datasets = { salesOrders, periodInvoices, allInvoices, periodPayments, periodReceipts, products, pendingDeliveries, bills, periodSupplierPayments, purchaseOrders, followUps, tasks, movements };
+    datasets = { salesOrders, periodDeliveries, periodInvoices, allInvoices, periodPayments, periodReceipts, products, pendingDeliveries, bills, periodSupplierPayments, purchaseOrders, followUps, tasks, movements };
   } catch (error) {
     const code = (error as { code?: string }).code;
     const message = code === "P2021" || code === "P2022"
@@ -173,7 +186,7 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
   }
 
   const {
-    salesOrders, periodInvoices, allInvoices, periodPayments, periodReceipts, products,
+    salesOrders, periodDeliveries, periodInvoices, allInvoices, periodPayments, periodReceipts, products,
     pendingDeliveries, bills, periodSupplierPayments, purchaseOrders, followUps, tasks, movements,
   } = datasets;
   const bookedSales = salesOrders.reduce((sum, order) => sum + number(order.total), 0)
@@ -199,17 +212,15 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
     return { ...bill, balance: Math.max(0, number(bill.total) - paid) };
   }).filter((bill) => bill.balance > 0.005);
   const payableTotal = payables.reduce((sum, bill) => sum + bill.balance, 0);
-  const grossProfit = salesOrders.reduce((sum, order) => sum + order.items.reduce((rowSum, item) => {
-    const delivered = number(item.deliveredQuantity);
-    if (!delivered) return rowSum;
-    const ratio = delivered / Math.max(number(item.quantity), 0.000001);
-    const revenueExTax = delivered * number(item.unitPrice) - number(item.discountAmount) * ratio;
-    return rowSum + revenueExTax - delivered * number(item.unitCost);
-  }, 0), 0);
-  const deliveredRevenue = salesOrders.reduce((sum, order) => sum + order.items.reduce((rowSum, item) => {
-    const delivered = number(item.deliveredQuantity);
-    return rowSum + delivered * number(item.unitPrice) - number(item.discountAmount) * delivered / Math.max(number(item.quantity), 0.000001);
-  }, 0), 0);
+  const deliveredProfitLines = periodDeliveries.flatMap((delivery) => delivery.items.map((item: any) => {
+    const quantity = number(item.quantity);
+    const orderedQuantity = Math.max(number(item.orderItem.quantity), 0.000001);
+    const revenue = quantity * number(item.orderItem.unitPrice) - number(item.orderItem.discountAmount) * quantity / orderedQuantity;
+    const costUnit = item.unitCost === null || item.unitCost === undefined ? number(item.product.purchaseCost) : number(item.unitCost);
+    return { revenue, cost: quantity * costUnit };
+  }));
+  const grossProfit = deliveredProfitLines.reduce((sum, item) => sum + item.revenue - item.cost, 0);
+  const deliveredRevenue = deliveredProfitLines.reduce((sum, item) => sum + item.revenue, 0);
   const grossMargin = deliveredRevenue > 0 ? grossProfit / deliveredRevenue * 100 : 0;
   const inventoryValue = products.reduce((sum, product) => sum + number(product.stockOnHand) * number(product.purchaseCost), 0);
   const lowStock = products.filter((product) => number(product.stockOnHand) <= number(product.reorderLevel));
@@ -220,8 +231,8 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
   const dueSoonInvoices = receivables.filter((item) => new Date(item.dueDate) >= today && new Date(item.dueDate) <= nextWeek);
   const delayedPOs = purchaseOrders.filter((item) => item.expectedAt && new Date(item.expectedAt) < today);
   const pendingReceiptCount = purchaseOrders.filter((po) => po.status === "PARTIALLY_RECEIVED").length;
-  const activeInvoiceIds = new Set(allInvoices.map((invoice) => invoice.id));
-  const actionCount = overdue.length + dueSoonInvoices.length + followUps.length + tasks.length + overdueDeliveries.length + lowStock.length + delayedPOs.length + movements.length;
+  const failedDeliveries = pendingDeliveries.filter((item) => item.status === "FAILED");
+  const actionCount = overdue.length + dueSoonInvoices.length + followUps.length + tasks.length + overdueDeliveries.length + failedDeliveries.length + lowStock.length + delayedPOs.length + movements.length;
   const topProducts = new Map<string, { id: string; sku: string; name: string; value: number; quantity: number }>();
   const topCustomers = new Map<string, { id: string; name: string; value: number; orders: number }>();
   for (const order of salesOrders) {
@@ -258,7 +269,7 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
     { label: "Customer receivables", value: money(receivablesTotal, currency), note: "Cumulative unpaid invoice balances", icon: CreditCard, href: "/crm/invoices", tone: "violet" },
     { label: "Overdue receivables", value: money(overdueTotal, currency), note: overdue.length + " overdue invoices", icon: AlertCircle, href: "/crm/invoices", tone: "amber" },
     { label: "Supplier payables", value: money(payableTotal, currency), note: "Unpaid supplier bills after posted allocations", icon: Wallet, href: "/operations/supplier-bills", tone: "amber" },
-    { label: "Est. gross profit", value: money(grossProfit, currency), note: "Delivered order items only · " + currencyPercent(grossMargin) + " margin", icon: Activity, href: "/operations/sales-orders", tone: "green" },
+    { label: "Est. gross profit", value: money(grossProfit, currency), note: "Delivered in period · estimated cost · " + currencyPercent(grossMargin) + " margin", icon: Activity, href: "/operations/sales-orders", tone: "green" },
     { label: "Orders · avg. value", value: String(orderCount) + " · " + money(averageOrder, currency), note: "Orders booked in selected period", icon: FileText, href: actionUrl("/operations/sales-orders"), tone: "blue" },
     { label: "Inventory valuation", value: money(inventoryValue, currency), note: "Estimated at current product purchase cost", icon: Boxes, href: "/operations/inventory", tone: "violet" },
     { label: "Pending deliveries", value: String(pendingDeliveries.filter((d) => ["PENDING", "DISPATCHED"].includes(d.status)).length), note: overdueDeliveries.length + " delayed", icon: Truck, href: "/operations/deliveries", tone: "amber" },
