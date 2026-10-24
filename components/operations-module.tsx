@@ -20,58 +20,73 @@ const defaultCatalogs: Catalogs = {
 
 const moduleConfig: Record<string, { title: string; description: string; columns: Column[]; empty: string; writable: boolean }> = {
   products: { title: "Products & inventory", description: "Manage SKUs, costs, selling prices, opening stock and reorder thresholds. Every stock change is recorded in the movement ledger.", columns: [
-    { key: "sku", label: "SKU" }, { key: "name", label: "Product" }, { key: "category", label: "Category" },
-    { key: "stockOnHand", label: "On hand" }, { key: "reorderLevel", label: "Reorder at" },
+    { key: "sku", label: "SKU" }, { key: "name", label: "Product" }, { key: "category", label: "Category" }, { key: "unit", label: "Unit" },
+    { key: "description", label: "Description" }, { key: "stockOnHand", label: "On hand" }, { key: "reorderLevel", label: "Reorder at" },
     { key: "purchaseCost", label: "Purchase cost" }, { key: "sellingPrice", label: "Selling price" }, { key: "status", label: "Status" },
+    { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No products yet. Add your first product to establish the catalogue.", writable: true },
   suppliers: { title: "Suppliers", description: "Maintain supplier contact details and payment terms for purchasing and payables.", columns: [
     { key: "name", label: "Supplier" }, { key: "company", label: "Company" }, { key: "email", label: "Email" },
-    { key: "phone", label: "Phone" }, { key: "taxId", label: "Tax ID" }, { key: "paymentTermsDays", label: "Terms (days)" }, { key: "status", label: "Status" },
+    { key: "phone", label: "Phone" }, { key: "address", label: "Address" }, { key: "taxId", label: "Tax ID" },
+    { key: "paymentTermsDays", label: "Terms (days)" }, { key: "status", label: "Status" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No suppliers recorded yet.", writable: true },
   "sales-orders": { title: "Orders & sales", description: "Create orders using current catalog prices. Orders do not deduct stock; stock is issued only when a delivery is completed.", columns: [
-    { key: "orderNumber", label: "Order" }, { key: "customer.name", label: "Customer" }, { key: "orderDate", label: "Date" },
-    { key: "items.length", label: "Lines" }, { key: "total", label: "Total" }, { key: "status", label: "Status" },
+    { key: "orderNumber", label: "Order" }, { key: "customer.name", label: "Customer" }, { key: "customer.company", label: "Company" },
+    { key: "orderDate", label: "Order date" }, { key: "expectedDeliveryAt", label: "Expected delivery" }, { key: "items.length", label: "Lines" },
+    { key: "subtotal", label: "Subtotal" }, { key: "discountAmount", label: "Discount" }, { key: "taxAmount", label: "Tax" },
+    { key: "total", label: "Total" }, { key: "status", label: "Status" }, { key: "notes", label: "Notes" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No sales orders in this workspace yet.", writable: true },
   "purchase-orders": { title: "Purchase orders", description: "Create supplier orders. Inventory increases only from a posted goods receipt—not when a purchase order is created.", columns: [
-    { key: "orderNumber", label: "PO number" }, { key: "supplier.name", label: "Supplier" }, { key: "orderDate", label: "Date" },
-    { key: "expectedAt", label: "Expected" }, { key: "total", label: "Total" }, { key: "status", label: "Status" },
+    { key: "orderNumber", label: "PO number" }, { key: "supplier.name", label: "Supplier" }, { key: "supplier.company", label: "Supplier company" },
+    { key: "orderDate", label: "Order date" }, { key: "expectedAt", label: "Expected" }, { key: "items.length", label: "Lines" },
+    { key: "subtotal", label: "Subtotal" }, { key: "taxAmount", label: "Tax" }, { key: "total", label: "Total" },
+    { key: "status", label: "Status" }, { key: "notes", label: "Notes" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No purchase orders yet.", writable: true },
   "goods-receipts": { title: "Goods receipts", description: "Post actual quantities received against purchase-order lines. Receipt posting and stock increases are atomic and idempotent.", columns: [
     { key: "receiptNumber", label: "Receipt" }, { key: "purchaseOrder.orderNumber", label: "Purchase order" },
-    { key: "purchaseOrder.supplier.name", label: "Supplier" }, { key: "receivedAt", label: "Received" }, { key: "items.length", label: "Lines" }, { key: "status", label: "Status" },
+    { key: "purchaseOrder.supplier.name", label: "Supplier" }, { key: "receivedAt", label: "Received" }, { key: "items.length", label: "Lines" },
+    { key: "notes", label: "Notes" }, { key: "status", label: "Status" }, { key: "createdAt", label: "Created" },
   ], empty: "No goods receipts have been posted.", writable: true },
   deliveries: { title: "Deliveries", description: "Create deliveries from confirmed orders, dispatch them, and post delivered quantities. Stock is deducted exactly once when delivery is completed.", columns: [
     { key: "deliveryNumber", label: "Delivery" }, { key: "order.orderNumber", label: "Order" },
-    { key: "order.customer.name", label: "Customer" }, { key: "scheduledAt", label: "Scheduled" },
-    { key: "assignedUser.name", label: "Assigned to" }, { key: "status", label: "Status" },
+    { key: "order.customer.name", label: "Customer" }, { key: "scheduledAt", label: "Scheduled" }, { key: "dispatchedAt", label: "Dispatched" },
+    { key: "completedAt", label: "Completed" }, { key: "assignedUser.name", label: "Assigned to" }, { key: "items.length", label: "Lines" },
+    { key: "proofOfDelivery", label: "Proof of delivery" }, { key: "failureReason", label: "Failure reason" }, { key: "status", label: "Status" }, { key: "createdAt", label: "Created" },
   ], empty: "No deliveries yet.", writable: true },
   "customer-receipts": { title: "Customer receipts & allocations", description: "Record an actual customer receipt and allocate portions across invoices. The receipt is counted once while each allocation reduces one invoice balance.", columns: [
-    { key: "receiptNumber", label: "Receipt" }, { key: "customer.name", label: "Customer" },
-    { key: "amount", label: "Received" }, { key: "method", label: "Method" },
-    { key: "receivedAt", label: "Date" }, { key: "allocations.length", label: "Allocations" }, { key: "status", label: "Status" },
+    { key: "receiptNumber", label: "Receipt" }, { key: "customer.name", label: "Customer" }, { key: "customer.company", label: "Company" },
+    { key: "amount", label: "Received" }, { key: "method", label: "Method" }, { key: "reference", label: "UTR / reference" },
+    { key: "receivedAt", label: "Date received" }, { key: "allocations.length", label: "Allocations" }, { key: "notes", label: "Notes" },
+    { key: "status", label: "Status" }, { key: "createdAt", label: "Created" },
   ], empty: "No customer receipts have been recorded.", writable: true },
   "supplier-bills": { title: "Supplier bills & payables", description: "Record supplier invoices separately from purchase orders, track due dates and monitor balances after allocated supplier payments.", columns: [
-    { key: "billNumber", label: "Bill number" }, { key: "supplier.name", label: "Supplier" },
-    { key: "dueDate", label: "Due date" }, { key: "total", label: "Total" }, { key: "paid", label: "Paid" }, { key: "balance", label: "Outstanding" }, { key: "status", label: "Status" },
+    { key: "billNumber", label: "Bill number" }, { key: "supplier.name", label: "Supplier" }, { key: "supplier.company", label: "Supplier company" },
+    { key: "purchaseOrder.orderNumber", label: "Purchase order" }, { key: "issueDate", label: "Issue date" }, { key: "dueDate", label: "Due date" },
+    { key: "total", label: "Total" }, { key: "paid", label: "Paid" }, { key: "balance", label: "Outstanding" }, { key: "status", label: "Status" },
+    { key: "notes", label: "Notes" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No supplier bills recorded.", writable: true },
   "supplier-payments": { title: "Supplier payments", description: "Record supplier payments and allocate amounts against supplier bills. Reversals are audited and do not delete history.", columns: [
-    { key: "supplier.name", label: "Supplier" }, { key: "amount", label: "Amount" }, { key: "method", label: "Method" },
-    { key: "paidAt", label: "Date" }, { key: "allocations.length", label: "Bill allocations" }, { key: "status", label: "Status" },
+    { key: "supplier.name", label: "Supplier" }, { key: "supplier.company", label: "Supplier company" }, { key: "amount", label: "Amount" },
+    { key: "method", label: "Method" }, { key: "reference", label: "UTR / reference" }, { key: "paidAt", label: "Date paid" },
+    { key: "allocations.length", label: "Bill allocations" }, { key: "notes", label: "Notes" }, { key: "status", label: "Status" }, { key: "createdAt", label: "Created" },
   ], empty: "No supplier payments recorded.", writable: true },
   inventory: { title: "Stock movement ledger", description: "Append-only inventory activity. Manual adjustments and stock issues are transaction-safe and cannot drive stock below zero.", columns: [
     { key: "createdAt", label: "Date" }, { key: "product.name", label: "Product" }, { key: "product.sku", label: "SKU" },
     { key: "movementType", label: "Movement" }, { key: "quantity", label: "Quantity" }, { key: "unitCost", label: "Unit cost" }, { key: "referenceType", label: "Reference" }, { key: "notes", label: "Notes" },
   ], empty: "No inventory movements recorded yet.", writable: true },
   "customer-follow-ups": { title: "Customer follow-ups", description: "Schedule collection reminders and other customer follow-ups. Mark each follow-up complete when action is taken.", columns: [
-    { key: "title", label: "Follow-up" }, { key: "customer.name", label: "Customer" }, { key: "dueAt", label: "Due" },
-    { key: "channel", label: "Channel" }, { key: "status", label: "Status" },
+    { key: "title", label: "Follow-up" }, { key: "customer.name", label: "Customer" }, { key: "assignedUser.name", label: "Assigned to" },
+    { key: "dueAt", label: "Due" }, { key: "channel", label: "Channel" }, { key: "status", label: "Status" },
+    { key: "notes", label: "Notes" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No customer follow-ups yet.", writable: true },
   ledger: { title: "Ledgers & accounts", description: "Review append-only customer/supplier ledger entries and their source transaction references.", columns: [
-    { key: "postedAt", label: "Posted" }, { key: "entryType", label: "Type" }, { key: "description", label: "Description" },
-    { key: "customer.name", label: "Customer" }, { key: "supplier.name", label: "Supplier" }, { key: "debit", label: "Debit" }, { key: "credit", label: "Credit" },
+    { key: "postedAt", label: "Posted" }, { key: "entryType", label: "Type" }, { key: "referenceType", label: "Reference type" }, { key: "referenceId", label: "Source record ID" },
+    { key: "description", label: "Description" }, { key: "customer.name", label: "Customer" }, { key: "supplier.name", label: "Supplier" },
+    { key: "debit", label: "Debit" }, { key: "credit", label: "Credit" }, { key: "createdByUserId", label: "Created by user ID" }, { key: "createdAt", label: "Created" },
   ], empty: "No ledger entries have been posted.", writable: false },
   permissions: { title: "Team & permissions", description: "Configure tenant-scoped module/action permissions for staff roles. Owners retain full access; staff cannot grant themselves permissions.", columns: [
-    { key: "role", label: "Role" }, { key: "moduleKey", label: "Module" }, { key: "actionKey", label: "Action" }, { key: "granted", label: "Granted" },
+    { key: "role", label: "Role" }, { key: "moduleKey", label: "Module" }, { key: "actionKey", label: "Action" },
+    { key: "granted", label: "Granted" }, { key: "updatedByUserId", label: "Updated by user ID" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No permission overrides set. Role defaults remain in effect until an explicit override is saved.", writable: true },
 };
 
@@ -85,12 +100,13 @@ function readKey(row: Row, path: string): unknown {
 function showValue(value: unknown, key: string) {
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
-  if (["total", "paid", "balance", "amount", "unitCost", "purchaseCost", "sellingPrice", "debit", "credit"].includes(key)) {
+  if (["total", "subtotal", "discountAmount", "taxAmount", "paid", "balance", "amount", "unitCost", "unitPrice", "purchaseCost", "sellingPrice", "debit", "credit"].includes(key)) {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(value));
   }
   if (/Date|At$|^date$|^dueDate$|^expectedAt$/.test(key) && !Number.isNaN(new Date(String(value)).valueOf())) {
     return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(String(value)));
   }
+  if (Array.isArray(value)) return value.map((entry) => typeof entry === "string" ? entry : JSON.stringify(entry)).join(" · ");
   if (key === "granted") return value ? "Granted" : "Denied";
   return String(value).replaceAll("_", " ");
 }
