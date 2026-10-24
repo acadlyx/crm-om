@@ -170,7 +170,8 @@ async function rowsFor(resource: string, tenantId: string) {
       return db.purchaseOrder.findMany({ where: { tenantId }, orderBy: { createdAt: "desc" }, take: 300, include: {
         supplier: { select: { id: true, name: true, company: true, email: true, phone: true, taxId: true } },
         items: { include: { product: { select: { id: true, sku: true, name: true, unit: true } } } },
-        receipts: { select: { id: true, receiptNumber: true, status: true, receivedAt: true } },
+        receipts: { select: { id: true, receiptNumber: true, status: true, receivedAt: true, notes: true } },
+        bills: { select: { id: true, billNumber: true, issueDate: true, dueDate: true, total: true, status: true, notes: true } },
       } });
     case "goods-receipts":
       return db.goodsReceipt.findMany({ where: { tenantId }, orderBy: { receivedAt: "desc" }, take: 300, include: {
