@@ -3,6 +3,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { requireWorkspaceAccess, writeAuditEvent } from "@/lib/crm/access";
 import { requireWorkspacePermission } from "@/lib/operations/permissions";
+import { customerCreditExposure } from "@/lib/operations/credit";
 
 function fail(message: string, status = 400) { return Response.json({ error: { message } }, { status }); }
 function n(value: unknown) { return Number(value ?? 0); }
@@ -157,18 +158,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
           : businessSettings?.defaultPaymentTermsDays ?? 0;
         const creditLimit = n(order.customer.creditLimit);
         if (customerTerms > 0 && creditLimit > 0) {
-          const openInvoices = await tx.invoice.findMany({
-            where: { tenantId, customerId: order.customerId, status: { not: "CANCELLED" } },
-            include: {
-              payments: { select: { amount: true, status: true } },
-              receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } },
-            },
-          });
-          const currentExposure = openInvoices.reduce((sum, invoice) => {
-            const postedPayments = invoice.payments.filter((payment) => payment.status === "POSTED").reduce((total, payment) => total + n(payment.amount), 0);
-            const allocatedReceipts = invoice.receiptAllocations.filter((allocation) => allocation.receipt.status === "POSTED").reduce((total, allocation) => total + n(allocation.amount), 0);
-            return sum + Math.max(0, n(invoice.total) - postedPayments - allocatedReceipts);
-          }, 0);
+          const currentExposure = await customerCreditExposure(tx, tenantId, order.customerId, order.id);
           if (currentExposure + n(order.total) > creditLimit + 0.005) {
             return { kind: "CREDIT_LIMIT_EXCEEDED" as const, creditLimit, currentExposure };
           }
