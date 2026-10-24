@@ -31,6 +31,7 @@ export default async function OperationsPage({ params }: { params: Promise<{ sec
   }
 
   const owner = access.user.role === "TENANT_ADMIN" || access.user.role === "PLATFORM_ADMIN";
+  const deletePermission = await requireWorkspacePermission(access, section, "delete");
   if (section === "upi-collections") return <UpiCollectionsModule canDelete={deletePermission.ok} />;
   return <OperationsModule resource={section} owner={owner} canDelete={deletePermission.ok} />;
 }
