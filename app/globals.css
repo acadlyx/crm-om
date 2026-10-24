@@ -231,3 +231,42 @@ a { color:inherit; text-decoration:none; }
 .workspace-migration-warning code { border:1px solid #efe0c5; border-radius:5px; padding:2px 5px; background:#fff5df; color:#774b10; font-size:11px; overflow-wrap:anywhere; }
 .workspace-migration-warning .workspace-migration-code { margin-top:14px; }
 @media(max-width:600px) { .workspace-migration-warning { padding:15px; gap:11px; } .workspace-migration-warning .workspace-form-icon { flex-basis:36px; width:36px; height:36px; } }
+
+
+/* Accessible show/hide control shared by login and workspace password fields. */
+.password-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+.password-input-wrap input.password-input {
+  width: 100%;
+  min-width: 0;
+  padding-right: 44px !important;
+}
+.password-visibility-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  color: #667085;
+  background: transparent;
+  cursor: pointer;
+}
+.password-visibility-toggle:hover {
+  color: #25334a;
+  background: #f2f5fa;
+}
+.password-visibility-toggle:focus-visible {
+  outline: 2px solid var(--brand-primary, #315fc9);
+  outline-offset: 1px;
+}
