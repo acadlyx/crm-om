@@ -353,10 +353,11 @@ model Payment {
   reference String?       @db.VarChar(160)
   paidAt    DateTime      @default(now()) @map("paid_at") @db.Timestamptz(6)
   notes     String?       @db.Text
+  status    ReceiptStatus @default(POSTED)
   createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([tenantId, paidAt])
-  @@index([tenantId, invoiceId])
+  @@index([tenantId, invoiceId, status])
   @@map("payments")
 }
 
