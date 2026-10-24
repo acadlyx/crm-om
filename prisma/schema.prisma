@@ -124,6 +124,7 @@ model User {
   name          String               @db.VarChar(160)
   email         String               @unique @db.VarChar(320)
   passwordHash  String               @map("password_hash")
+  isActive      Boolean              @default(true) @map("is_active")
   role          UserRole             @default(STAFF)
   tenantId      String?              @map("tenant_id") @db.Uuid
   tenant        Tenant?              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
