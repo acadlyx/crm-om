@@ -601,3 +601,23 @@ a { color:inherit; text-decoration:none; }
   .owner-ageing-label { font-size:10px; }
   .owner-action-row { padding-left:4px; padding-right:4px; }
 }
+
+
+.crm-table-toolbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.crm-table-toolbar-actions .crm-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+@media(max-width:760px) {
+  .crm-table-toolbar-actions { width: 100%; }
+  .crm-table-toolbar-actions .crm-search { width: 100%; max-width: none; }
+  .crm-table-toolbar-actions .crm-secondary-button { flex: 1; }
+}
