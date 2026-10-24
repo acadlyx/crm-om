@@ -98,7 +98,7 @@ export default async function DashboardPage() {
   let openDealCount = 0;
   let openTaskCount = 0;
 
-  if (tenantId && !isPlatformAdmin) {
+  if (tenantId) {
     const monthStart = new Date();
     monthStart.setDate(1);
     monthStart.setHours(0, 0, 0, 0);
@@ -133,7 +133,7 @@ export default async function DashboardPage() {
     ? "Platform administrator"
     : session.user.role === "TENANT_ADMIN" ? "Business administrator" : "Team member";
 
-  const metrics = isPlatformAdmin
+  const metrics = isPlatformAdmin && !tenantId
     ? [
         { label: "Business workspaces", value: workspaceCount, note: "Customer organizations", icon: Building2, tone: "blue" },
         { label: "User accounts", value: userCount, note: "Across the platform", icon: Users, tone: "violet" },
@@ -153,19 +153,16 @@ export default async function DashboardPage() {
       ];
 
   const quickActions = [
-    ...(isPlatformAdmin
-      ? [
-          { title: "Business workspaces", description: workspaceCount + " business workspace(s) · create owner accounts", href: "/platform-settings/workspaces", icon: Building2 },
-          { title: "Platform branding", description: "Update product name, logo and support details", href: "/platform-settings/branding", icon: Palette },
-        ]
-      : tenantId
-        ? [
-            { title: "Customers & contacts", description: "Manage your customer directory", href: "/crm/customers", icon: Users },
-            { title: "Create an invoice", description: "Bill a customer and track the balance", href: "/crm/invoices", icon: FileText },
-            { title: "Record a payment", description: "Log receipts and update invoice balances", href: "/crm/payments", icon: HandCoins },
-            { title: "Expenses & reports", description: "Track business costs and cash flow", href: "/crm/expenses", icon: Wallet },
-          ]
-        : []),
+    ...(isPlatformAdmin ? [
+      { title: "Business workspaces", description: workspaceCount + " business workspace(s) · manage owner access", href: "/platform-settings/workspaces", icon: Building2 },
+      { title: "Platform branding", description: "Update product name, logo and support details", href: "/platform-settings/branding", icon: Palette },
+    ] : []),
+    ...(tenantId ? [
+      { title: "Customers & contacts", description: "Manage your customer directory", href: "/crm/customers", icon: Users },
+      { title: "Create an invoice", description: "Bill a customer and track the balance", href: "/crm/invoices", icon: FileText },
+      { title: "Record a payment", description: "Log receipts and update invoice balances", href: "/crm/payments", icon: HandCoins },
+      { title: "Expenses & reports", description: "Track business costs and cash flow", href: "/crm/expenses", icon: Wallet },
+    ] : []),
     { title: "Notifications", description: notificationCount
         ? notificationCount + " notification" + (notificationCount === 1 ? "" : "s") + " in your inbox"
         : "View system updates and alerts", href: "/notifications", icon: Bell },
@@ -199,11 +196,11 @@ export default async function DashboardPage() {
       <div className="dashboard-content-grid">
         <section className="card dashboard-panel">
           <div className="dashboard-panel-heading">
-            <div><p className="dashboard-eyebrow">AT A GLANCE</p><h2>{isPlatformAdmin ? "Platform overview" : "Your workspace"}</h2></div>
+            <div><p className="dashboard-eyebrow">AT A GLANCE</p><h2>{isPlatformAdmin && !tenantId ? "Platform overview" : "Your workspace"}</h2></div>
             <span className="dashboard-live"><span />Live data</span>
           </div>
 
-          {isPlatformAdmin ? (
+          {isPlatformAdmin && !tenantId ? (
             <div className="dashboard-overview-callout">
               <div className="dashboard-callout-icon"><Sparkles size={22} aria-hidden="true" /></div>
               <div>

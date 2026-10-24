@@ -119,7 +119,7 @@ export function CrmModule({
       const result = await response.json();
       if (!response.ok) throw new Error(result?.error?.message || "Could not update this record.");
       setRows((current) => current.map((item) => item.id === row.id ? { ...item, [workflow.field]: value } : item));
-      setNotice("Record updated.");
+      setNotice(resource === "leads" && value === "CONVERTED" && result?.data?.customerId ? "Lead converted to a customer record." : "Record updated.");
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not update this record.");

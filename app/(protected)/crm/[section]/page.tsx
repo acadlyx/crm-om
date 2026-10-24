@@ -46,12 +46,13 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       db.expense.findMany({ where: { tenantId }, orderBy: { spentAt: "desc" }, take: 5, select: { id: true, title: true, amount: true, status: true, spentAt: true } }),
     ]);
 
-    const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const outstanding = invoices.map((invoice) => {
       const paid = invoice.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
       return { ...invoice, paid, balance: Math.max(0, Number(invoice.total) - paid) };
     }).filter((invoice) => invoice.balance > 0);
-    const overdue = outstanding.filter((invoice) => invoice.dueDate < now);
+    const overdue = outstanding.filter((invoice) => invoice.dueDate < today);
     const collected = Number(payments._sum.amount || 0);
     const spent = Number(expenses._sum.amount || 0);
     const openValue = Number(pipeline._sum.value || 0);
@@ -185,7 +186,8 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       rows = records.map((item) => {
         const paidAmount = item.payments.reduce((sum, p) => sum + Number(p.amount), 0);
         const balance = Math.max(0, Number(item.total) - paidAmount);
-        const status = balance > 0 && item.dueDate < new Date() && item.status !== "CANCELLED" ? "OVERDUE" : item.status;
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const status = balance > 0 && item.dueDate < today && item.status !== "CANCELLED" ? "OVERDUE" : item.status;
         return { id: item.id, invoiceNumber: item.invoiceNumber, customerName: item.customer.name, total: Number(item.total), paidAmount, balance, status, dueDate: item.dueDate.toISOString() };
       });
       fields = [

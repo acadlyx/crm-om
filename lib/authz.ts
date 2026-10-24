@@ -9,10 +9,10 @@ export function canManagePlatformBranding(role: string | null | undefined): bool
   return role === "PLATFORM_ADMIN";
 }
 export function canManageTenantSettings(role: string | null | undefined, tenantId: string | null | undefined): boolean {
-  return role === "TENANT_ADMIN" && typeof tenantId === "string" && tenantId.length > 0;
+  return (role === "TENANT_ADMIN" || role === "PLATFORM_ADMIN") && typeof tenantId === "string" && tenantId.length > 0;
 }
 export function tenantScopeForSession(role: string | null | undefined, sessionTenantId: string | null | undefined, requestedTenantId?: string | null): string | null {
-  if (role !== "TENANT_ADMIN" || !sessionTenantId) return null;
+  if ((role !== "TENANT_ADMIN" && role !== "PLATFORM_ADMIN") || !sessionTenantId) return null;
   if (requestedTenantId && requestedTenantId !== sessionTenantId) return null;
   return sessionTenantId;
 }

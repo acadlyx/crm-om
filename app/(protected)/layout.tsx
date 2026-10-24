@@ -10,7 +10,7 @@ export default async function ProtectedLayout({ children }: { children: React.Re
   if (!session?.user?.email) redirect("/login");
   const brand = await getPlatformBranding();
   return <div className="shell">
-    <AppSidebar branding={brand} role={session.user.role} />
+    <AppSidebar branding={brand} role={session.user.role} tenantId={session.user.tenantId} />
     <main className="main-content">
       {children}
       <footer className="muted" style={{marginTop:40,borderTop:"1px solid #e8ebf0",paddingTop:16,fontSize:12}}>

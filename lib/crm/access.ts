@@ -14,7 +14,7 @@ export async function requireWorkspaceAccess() {
     select: { id: true, name: true, email: true, role: true, tenantId: true },
   });
 
-  if (!user || (user.role !== "TENANT_ADMIN" && user.role !== "STAFF") || !user.tenantId) {
+  if (!user || (user.role !== "TENANT_ADMIN" && user.role !== "STAFF" && !(user.role === "PLATFORM_ADMIN" && user.tenantId)) || !user.tenantId) {
     return {
       ok: false as const,
       status: 403,

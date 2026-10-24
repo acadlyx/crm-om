@@ -6,9 +6,9 @@ import {
   ContactRound, KanbanSquare, Palette, Users, Wallet,
 } from "lucide-react";
 
-export function AppSidebar({ branding, role }: { branding: Branding; role: string }) {
+export function AppSidebar({ branding, role, tenantId }: { branding: Branding; role: string; tenantId?: string | null }) {
   const isPlatformAdmin = role === "PLATFORM_ADMIN";
-  const isBusinessUser = role === "TENANT_ADMIN" || role === "STAFF";
+  const isBusinessUser = role === "TENANT_ADMIN" || role === "STAFF" || (isPlatformAdmin && !!tenantId);
 
   return (
     <aside className="sidebar">
@@ -28,7 +28,7 @@ export function AppSidebar({ branding, role }: { branding: Branding; role: strin
           <Link className="sidebar-link" href="/crm/expenses"><Wallet size={17} aria-hidden="true" />Expenses</Link>
           <Link className="sidebar-link" href="/crm/tasks"><CheckSquare size={17} aria-hidden="true" />Tasks & follow-ups</Link>
           <Link className="sidebar-link" href="/crm/reports"><Activity size={17} aria-hidden="true" />Reports</Link>
-          {role === "TENANT_ADMIN" && <Link className="sidebar-link" href="/settings/business"><Building2 size={17} aria-hidden="true" />Business settings</Link>}
+          {(role === "TENANT_ADMIN" || (isPlatformAdmin && !!tenantId)) && <Link className="sidebar-link" href="/settings/business"><Building2 size={17} aria-hidden="true" />Business settings</Link>}
         </>}
         <p className="sidebar-section-label">ACCOUNT</p>
         <Link className="sidebar-link" href="/notifications"><Bell size={17} aria-hidden="true" />Notifications</Link>

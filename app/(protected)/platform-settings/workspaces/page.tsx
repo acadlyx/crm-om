@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function WorkspacesPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) redirect("/login");
-  const user = await db.user.findUnique({ where: { email: session.user.email }, select: { role: true } });
+  const user = await db.user.findUnique({ where: { email: session.user.email }, select: { role: true, name: true, email: true, tenantId: true } });
   if (user?.role !== "PLATFORM_ADMIN") redirect("/dashboard");
 
   const tenants = await db.tenant.findMany({
@@ -27,7 +27,7 @@ export default async function WorkspacesPage() {
       <div className="dashboard-heading">
         <div><p className="dashboard-eyebrow">PLATFORM ADMINISTRATION</p><h1>Business workspaces</h1><p className="dashboard-subtitle">Create independent business accounts. Each owner sees only their own customers, sales and financial records.</p></div>
       </div>
-      <section className="card workspace-admin-card"><WorkspaceForm /></section>
+      <section className="card workspace-admin-card"><WorkspaceForm currentAccount={{ name: user.name, email: user.email, hasWorkspace: !!user.tenantId }} /></section>
       <section className="card workspace-list-card">
         <div className="dashboard-panel-heading"><div><p className="dashboard-eyebrow">TENANT DIRECTORY</p><h2>Existing workspaces</h2></div><span className="dashboard-panel-count">{tenants.length} total</span></div>
         {tenants.length ? (

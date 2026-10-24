@@ -14,6 +14,42 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
 
   try {
     let updated: { count: number } | null = null;
+    if (resource === "leads" && body.status === "CONVERTED") {
+      const conversion = await db.$transaction(async (tx) => {
+        const lead = await tx.lead.findFirst({
+          where: { id, tenantId: access.tenantId },
+          select: { id: true, fullName: true, company: true, email: true, phone: true, status: true },
+        });
+        if (!lead) return null;
+        if (lead.status === "CONVERTED") return { customerId: null, alreadyConverted: true };
+        const matchingCustomer = lead.email
+          ? await tx.customer.findFirst({ where: { tenantId: access.tenantId, email: lead.email }, select: { id: true } })
+          : null;
+        const customer = matchingCustomer || await tx.customer.create({
+          data: {
+            tenantId: access.tenantId,
+            name: lead.fullName,
+            company: lead.company,
+            email: lead.email,
+            phone: lead.phone,
+            notes: "Converted from a CRM lead.",
+          },
+          select: { id: true },
+        });
+        await tx.lead.update({ where: { id: lead.id }, data: { status: "CONVERTED" } });
+        return { customerId: customer.id, alreadyConverted: false };
+      });
+      if (!conversion) return Response.json({ error: { message: "Lead not found in this workspace." } }, { status: 404 });
+      await writeAuditEvent({
+        actorUserId: access.user.id,
+        action: "CONVERT_LEAD",
+        entityType: "LEAD",
+        entityId: id,
+        metadata: { customerId: conversion.customerId },
+      });
+      return Response.json({ data: { id, updated: true, ...conversion } });
+    }
+
     if (resource === "customers") {
       const parsed = z.object({ status: z.enum(["ACTIVE", "INACTIVE"]) }).safeParse(body);
       if (!parsed.success) return Response.json({ error: { message: "Choose a valid customer status." } }, { status: 400 });
