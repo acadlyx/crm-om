@@ -34,45 +34,45 @@ const moduleConfig: Record<string, { title: string; description: string; columns
     { key: "orderNumber", label: "Order" }, { key: "customer.name", label: "Customer" }, { key: "customer.company", label: "Company" },
     { key: "orderDate", label: "Order date" }, { key: "expectedDeliveryAt", label: "Expected delivery" }, { key: "items.length", label: "Lines" },
     { key: "subtotal", label: "Subtotal" }, { key: "discountAmount", label: "Discount" }, { key: "taxAmount", label: "Tax" },
-    { key: "total", label: "Total" }, { key: "status", label: "Status" }, { key: "notes", label: "Notes" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
+    { key: "total", label: "Total" }, { key: "status", label: "Status" }, { key: "notes", label: "Notes" }, { key: "items", label: "Item details" }, { key: "deliveries", label: "Delivery history" }, { key: "invoices", label: "Invoice history" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No sales orders in this workspace yet.", writable: true },
   "purchase-orders": { title: "Purchase orders", description: "Create supplier orders. Inventory increases only from a posted goods receipt—not when a purchase order is created.", columns: [
     { key: "orderNumber", label: "PO number" }, { key: "supplier.name", label: "Supplier" }, { key: "supplier.company", label: "Supplier company" },
     { key: "orderDate", label: "Order date" }, { key: "expectedAt", label: "Expected" }, { key: "items.length", label: "Lines" },
     { key: "subtotal", label: "Subtotal" }, { key: "taxAmount", label: "Tax" }, { key: "total", label: "Total" },
-    { key: "status", label: "Status" }, { key: "notes", label: "Notes" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
+    { key: "status", label: "Status" }, { key: "notes", label: "Notes" }, { key: "items", label: "Item details" }, { key: "receipts", label: "Receipt history" }, { key: "bills", label: "Supplier bills" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No purchase orders yet.", writable: true },
   "goods-receipts": { title: "Goods receipts", description: "Post actual quantities received against purchase-order lines. Receipt posting and stock increases are atomic and idempotent.", columns: [
     { key: "receiptNumber", label: "Receipt" }, { key: "purchaseOrder.orderNumber", label: "Purchase order" },
     { key: "purchaseOrder.supplier.name", label: "Supplier" }, { key: "receivedAt", label: "Received" }, { key: "items.length", label: "Lines" },
-    { key: "notes", label: "Notes" }, { key: "status", label: "Status" }, { key: "createdAt", label: "Created" },
+    { key: "notes", label: "Notes" }, { key: "items", label: "Item details" }, { key: "status", label: "Status" }, { key: "createdAt", label: "Created" },
   ], empty: "No goods receipts have been posted.", writable: true },
   deliveries: { title: "Deliveries", description: "Create deliveries from confirmed orders, dispatch them, and post delivered quantities. Stock is deducted exactly once when delivery is completed.", columns: [
     { key: "deliveryNumber", label: "Delivery" }, { key: "order.orderNumber", label: "Order" },
     { key: "order.customer.name", label: "Customer" }, { key: "scheduledAt", label: "Scheduled" }, { key: "dispatchedAt", label: "Dispatched" },
     { key: "completedAt", label: "Completed" }, { key: "assignedUser.name", label: "Assigned to" }, { key: "items.length", label: "Lines" },
-    { key: "proofOfDelivery", label: "Proof of delivery" }, { key: "failureReason", label: "Failure reason" }, { key: "status", label: "Status" }, { key: "createdAt", label: "Created" },
+    { key: "proofOfDelivery", label: "Proof of delivery" }, { key: "failureReason", label: "Failure reason" }, { key: "status", label: "Status" }, { key: "items", label: "Delivered items" }, { key: "createdByUserId", label: "Created by user ID" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No deliveries yet.", writable: true },
   "customer-receipts": { title: "Customer receipts & allocations", description: "Record an actual customer receipt and allocate portions across invoices. The receipt is counted once while each allocation reduces one invoice balance.", columns: [
     { key: "receiptNumber", label: "Receipt" }, { key: "customer.name", label: "Customer" }, { key: "customer.company", label: "Company" },
     { key: "amount", label: "Received" }, { key: "method", label: "Method" }, { key: "reference", label: "UTR / reference" },
     { key: "receivedAt", label: "Date received" }, { key: "allocations.length", label: "Allocations" }, { key: "notes", label: "Notes" },
-    { key: "status", label: "Status" }, { key: "createdAt", label: "Created" },
+    { key: "status", label: "Status" }, { key: "allocations", label: "Invoice allocations" }, { key: "createdByUserId", label: "Created by user ID" }, { key: "createdAt", label: "Created" },
   ], empty: "No customer receipts have been recorded.", writable: true },
   "supplier-bills": { title: "Supplier bills & payables", description: "Record supplier invoices separately from purchase orders, track due dates and monitor balances after allocated supplier payments.", columns: [
     { key: "billNumber", label: "Bill number" }, { key: "supplier.name", label: "Supplier" }, { key: "supplier.company", label: "Supplier company" },
     { key: "purchaseOrder.orderNumber", label: "Purchase order" }, { key: "issueDate", label: "Issue date" }, { key: "dueDate", label: "Due date" },
     { key: "total", label: "Total" }, { key: "paid", label: "Paid" }, { key: "balance", label: "Outstanding" }, { key: "status", label: "Status" },
-    { key: "notes", label: "Notes" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
+    { key: "notes", label: "Notes" }, { key: "allocations", label: "Payment allocations" }, { key: "createdByUserId", label: "Created by user ID" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No supplier bills recorded.", writable: true },
   "supplier-payments": { title: "Supplier payments", description: "Record supplier payments and allocate amounts against supplier bills. Reversals are audited and do not delete history.", columns: [
     { key: "supplier.name", label: "Supplier" }, { key: "supplier.company", label: "Supplier company" }, { key: "amount", label: "Amount" },
     { key: "method", label: "Method" }, { key: "reference", label: "UTR / reference" }, { key: "paidAt", label: "Date paid" },
-    { key: "allocations.length", label: "Bill allocations" }, { key: "notes", label: "Notes" }, { key: "status", label: "Status" }, { key: "createdAt", label: "Created" },
+    { key: "allocations.length", label: "Bill allocations" }, { key: "allocations", label: "Allocation details" }, { key: "notes", label: "Notes" }, { key: "createdByUserId", label: "Created by user ID" }, { key: "status", label: "Status" }, { key: "createdAt", label: "Created" },
   ], empty: "No supplier payments recorded.", writable: true },
   inventory: { title: "Stock movement ledger", description: "Append-only inventory activity. Manual adjustments and stock issues are transaction-safe and cannot drive stock below zero.", columns: [
     { key: "createdAt", label: "Date" }, { key: "product.name", label: "Product" }, { key: "product.sku", label: "SKU" },
-    { key: "movementType", label: "Movement" }, { key: "quantity", label: "Quantity" }, { key: "unitCost", label: "Unit cost" }, { key: "referenceType", label: "Reference" }, { key: "notes", label: "Notes" },
+    { key: "movementType", label: "Movement" }, { key: "quantity", label: "Quantity" }, { key: "unitCost", label: "Unit cost" }, { key: "referenceType", label: "Reference type" }, { key: "referenceId", label: "Source record ID" }, { key: "idempotencyKey", label: "Idempotency key" }, { key: "createdByUserId", label: "Created by user ID" }, { key: "notes", label: "Notes" },
   ], empty: "No inventory movements recorded yet.", writable: true },
   "customer-follow-ups": { title: "Customer follow-ups", description: "Schedule collection reminders and other customer follow-ups. Mark each follow-up complete when action is taken.", columns: [
     { key: "title", label: "Follow-up" }, { key: "customer.name", label: "Customer" }, { key: "assignedUser.name", label: "Assigned to" },
@@ -97,17 +97,50 @@ function readKey(row: Row, path: string): unknown {
     return (value as Record<string, unknown>)[part];
   }, row as unknown);
 }
-function showValue(value: unknown, key: string) {
+function showValue(value: unknown, key: string): string {
   if (value === null || value === undefined || value === "") return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (Array.isArray(value)) {
+    if (!value.length) return "—";
+    return value.map((entry) => {
+      if (!entry || typeof entry !== "object") return String(entry ?? "");
+      const item = entry as Record<string, unknown>;
+      const product = item.product && typeof item.product === "object" ? item.product as Record<string, unknown> : {};
+      const orderItem = item.orderItem && typeof item.orderItem === "object" ? item.orderItem as Record<string, unknown> : {};
+      const invoice = item.invoice && typeof item.invoice === "object" ? item.invoice as Record<string, unknown> : {};
+      const bill = item.bill && typeof item.bill === "object" ? item.bill as Record<string, unknown> : {};
+      const payment = item.payment && typeof item.payment === "object" ? item.payment as Record<string, unknown> : {};
+      const parts = [
+        item.sku || product.sku ? String(item.sku || product.sku) : "",
+        item.name || product.name ? String(item.name || product.name) : "",
+        item.quantity != null ? "qty " + String(item.quantity) : "",
+        item.unitPrice != null || orderItem.unitPrice != null ? "unit price " + String(item.unitPrice ?? orderItem.unitPrice) : "",
+        item.discountAmount != null || orderItem.discountAmount != null ? "discount " + String(item.discountAmount ?? orderItem.discountAmount) : "",
+        item.taxAmount != null || orderItem.taxAmount != null ? "tax " + String(item.taxAmount ?? orderItem.taxAmount) : "",
+        invoice.invoiceNumber ? "invoice " + String(invoice.invoiceNumber) : "",
+        bill.billNumber ? "bill " + String(bill.billNumber) : "",
+        payment.reference ? "UTR " + String(payment.reference) : "",
+        payment.paidAt ? "paid " + showValue(payment.paidAt, "paidAt") : "",
+        item.amount != null ? "amount " + new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(item.amount)) : "",
+        item.status ? "status " + titleCase(String(item.status)) : "",
+        item.deliveryNumber ? "delivery " + String(item.deliveryNumber) : "",
+        item.receiptNumber ? "receipt " + String(item.receiptNumber) : "",
+        item.invoiceNumber ? "invoice " + String(item.invoiceNumber) : "",
+        item.orderNumber ? "order " + String(item.orderNumber) : "",
+      ].filter(Boolean);
+      return parts.length ? parts.join(" · ") : Object.entries(item)
+        .filter(([, v]) => v == null || ["string", "number", "boolean"].includes(typeof v))
+        .map(([k, v]) => k + ": " + String(v ?? "—")).join(", ");
+    }).join(" | ");
+  }
   if (["total", "subtotal", "discountAmount", "taxAmount", "paid", "balance", "amount", "unitCost", "unitPrice", "purchaseCost", "sellingPrice", "debit", "credit"].includes(key)) {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(value));
   }
   if (/Date|At$|^date$|^dueDate$|^expectedAt$/.test(key) && !Number.isNaN(new Date(String(value)).valueOf())) {
     return new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(String(value)));
   }
-  if (Array.isArray(value)) return value.map((entry) => typeof entry === "string" ? entry : JSON.stringify(entry)).join(" · ");
   if (key === "granted") return value ? "Granted" : "Denied";
+  if (/passwordHash|idempotencyKey/.test(key)) return "Hidden";
   return String(value).replaceAll("_", " ");
 }
 function titleCase(value: string) {
