@@ -4,7 +4,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowDownToLine, ArrowRight, ArrowUpRight, CheckCircle2, CircleAlert, LoaderCircle,
-  Plus, Search, X,
+  Plus, Search, Trash2, X,
 } from "lucide-react";
 
 export type CrmField = {
@@ -51,7 +51,7 @@ function display(value: unknown, key: string) {
 }
 
 export function CrmModule({
-  resource, title, description, fields, columns, initialRows, workflow, recordLabel, owner = false, canUpdate = false,
+  resource, title, description, fields, columns, initialRows, workflow, recordLabel, owner = false, canUpdate = false, canDelete = false,
 }: {
   resource: string;
   title: string;
@@ -63,6 +63,7 @@ export function CrmModule({
   recordLabel?: string;
   owner?: boolean;
   canUpdate?: boolean;
+  canDelete?: boolean;
 }) {
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
@@ -180,6 +181,31 @@ export function CrmModule({
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not update this record.");
+    } finally {
+      setBusyRow("");
+    }
+  }
+
+  async function deleteRecord(row: CrmRow) {
+    if (!canDelete) { setError("Your workspace role cannot delete records."); return; }
+    const label = String(row[columns[0]?.key] || row.id);
+    if (!window.confirm("Delete " + label + "? Financial records, linked records and audit history are protected by the server.")) return;
+    setBusyRow(row.id);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/v1/crm/" + resource + "/" + encodeURIComponent(row.id), {
+        method: "DELETE",
+        cache: "no-store",
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error?.message || "Could not delete this record.");
+      setRows((current) => current.filter((item) => item.id !== row.id));
+      if (editingCustomer?.id === row.id) setEditingCustomer(null);
+      setNotice("Record deleted. The action was recorded in the audit log.");
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not delete this record.");
     } finally {
       setBusyRow("");
     }
@@ -322,7 +348,7 @@ export function CrmModule({
         </div>
         {filteredRows.length ? (
           <div className="crm-table-wrap"><table className="crm-table">
-            <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}{workflow && canUpdate && <th>{workflow.label}</th>}{((resource === "payments" && owner) || (resource === "customers" && canUpdate)) && <th>Actions</th>}</tr></thead>
+            <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}{workflow && canUpdate && <th>{workflow.label}</th>}{(canDelete || (resource === "payments" && owner) || (resource === "customers" && canUpdate)) && <th>Actions</th>}</tr></thead>
             <tbody>{filteredRows.slice(0, visibleCount).map((row) => (
               <tr key={row.id}>
                 {columns.map((column, index) => {
@@ -333,10 +359,13 @@ export function CrmModule({
                 {workflow && canUpdate && <td><select className="crm-workflow-select" value={String(row[workflow.field] || "")} disabled={busyRow === row.id} onChange={(event) => updateWorkflow(row, event.target.value)} aria-label={workflow.label + " for " + String(row[columns[0]?.key] || "record")}>
                   {workflow.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>{busyRow === row.id && <LoaderCircle size={13} className="workspace-spinner crm-inline-spinner" />}</td>}
-                {resource === "customers" && canUpdate && <td><button type="button" className="crm-secondary-button" onClick={() => { setError(""); setNotice(""); setEditingCustomer(row); }}>Edit profile</button></td>}
-                {resource === "payments" && owner && <td>{row.status === "POSTED"
-                  ? <button type="button" className="crm-secondary-button is-danger" disabled={busyRow === row.id} onClick={() => void reversePayment(row)}>{busyRow === row.id ? <LoaderCircle size={13} className="workspace-spinner" /> : "Reverse payment"}</button>
-                  : <span className="crm-pill crm-pill-overdue">Reversed</span>}</td>}
+                {(canDelete || (resource === "payments" && owner) || (resource === "customers" && canUpdate)) && <td><div className="operations-row-actions">
+                  {resource === "customers" && canUpdate && <button type="button" className="crm-secondary-button" onClick={() => { setError(""); setNotice(""); setEditingCustomer(row); }}>Edit profile</button>}
+                  {resource === "payments" && owner && (row.status === "POSTED"
+                    ? <button type="button" className="crm-secondary-button is-danger" disabled={busyRow === row.id} onClick={() => void reversePayment(row)}>{busyRow === row.id ? <LoaderCircle size={13} className="workspace-spinner" /> : "Reverse payment"}</button>
+                    : <span className="crm-pill crm-pill-overdue">Reversed</span>)}
+                  {canDelete && <button type="button" className="crm-secondary-button is-danger" disabled={busyRow === row.id} onClick={() => void deleteRecord(row)}>{busyRow === row.id ? <LoaderCircle size={13} className="workspace-spinner" /> : <Trash2 size={14} />}Delete</button>}
+                </div></td>}
               </tr>
             ))}</tbody>
           </table></div>

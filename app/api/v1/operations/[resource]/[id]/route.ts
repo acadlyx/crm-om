@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isSameOriginRequest } from "@/lib/security/http";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { requireWorkspaceAccess, writeAuditEvent } from "@/lib/crm/access";
@@ -544,5 +545,133 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
     if ((error as { code?: string }).code === "P2034") return fail("A concurrent transaction changed these records. Refresh and retry.", 409);
     console.error("Operations update failed:", resource, (error as { code?: string }).code || "UNKNOWN", message.slice(0, 180));
     return fail("Could not update this business operation. No partial transaction was committed.", 500);
+  }
+}
+
+export async function DELETE(request: Request, context: { params: Promise<{ resource: string; id: string }> }) {
+  const fail = (status: number, message: string) =>
+    Response.json({ error: { message } }, { status, headers: { "Cache-Control": "private, no-store" } });
+  if (!isSameOriginRequest(request)) return fail(403, "Cross-origin changes are not allowed.");
+
+  const access = await requireWorkspaceAccess();
+  if (!access.ok) return fail(access.status, access.message);
+  const { resource, id } = await context.params;
+  if (!z.string().uuid().safeParse(id).success) return fail(400, "Invalid record identifier.");
+
+  const permission = await requireWorkspacePermission(access, resource, "delete");
+  if (!permission.ok) return fail(permission.status, permission.message);
+
+  const supported = new Set([
+    "products", "suppliers", "sales-orders", "purchase-orders", "goods-receipts",
+    "deliveries", "customer-receipts", "supplier-bills", "supplier-payments",
+    "inventory", "customer-follow-ups", "ledger", "permissions",
+  ]);
+  if (!supported.has(resource)) return fail(404, "Delete is not available for this record type.");
+
+  try {
+    const result = await db.$transaction(async (tx) => {
+      let entityType = resource.replaceAll("-", "_").replace(/s$/, "").toUpperCase();
+      if (resource === "products") {
+        const row = await tx.product.findFirst({
+          where: { id, tenantId: access.tenantId },
+          include: { _count: { select: { orderItems: true, purchaseItems: true, receiptItems: true, deliveryItems: true, movements: true, invoiceItems: true } } },
+        });
+        if (!row) return { kind: "NOT_FOUND" as const };
+        const related = Object.values(row._count).reduce((sum, count) => sum + count, 0);
+        if (Number(row.stockOnHand) > 0 || related > 0) {
+          return { kind: "IN_USE" as const, reason: "This product has stock or transaction history. Deactivate it instead; stock and movement history must be preserved." };
+        }
+        await tx.product.delete({ where: { id: row.id } });
+      } else if (resource === "suppliers") {
+        const row = await tx.supplier.findFirst({
+          where: { id, tenantId: access.tenantId },
+          include: { _count: { select: { purchaseOrders: true, bills: true, payments: true, ledgerEntries: true } } },
+        });
+        if (!row) return { kind: "NOT_FOUND" as const };
+        if (Object.values(row._count).some((count) => count > 0)) {
+          return { kind: "IN_USE" as const, reason: "This supplier has purchase, bill, payment or ledger history. Mark the supplier inactive instead." };
+        }
+        await tx.supplier.delete({ where: { id: row.id } });
+      } else if (resource === "sales-orders") {
+        const row = await tx.salesOrder.findFirst({
+          where: { id, tenantId: access.tenantId },
+          include: { _count: { select: { deliveries: true, invoices: true } } },
+        });
+        if (!row) return { kind: "NOT_FOUND" as const };
+        if (row.status !== "DRAFT" || row._count.deliveries || row._count.invoices) {
+          return { kind: "IN_USE" as const, reason: "Only draft orders with no deliveries or invoices can be deleted. Confirmed or fulfilled orders remain in audit history." };
+        }
+        await tx.salesOrder.delete({ where: { id: row.id } });
+      } else if (resource === "purchase-orders") {
+        const row = await tx.purchaseOrder.findFirst({
+          where: { id, tenantId: access.tenantId },
+          include: { _count: { select: { receipts: true, bills: true } } },
+        });
+        if (!row) return { kind: "NOT_FOUND" as const };
+        if (row.status !== "DRAFT" || row._count.receipts || row._count.bills) {
+          return { kind: "IN_USE" as const, reason: "Only a draft purchase order with no goods receipts or supplier bills can be deleted." };
+        }
+        await tx.purchaseOrder.delete({ where: { id: row.id } });
+      } else if (resource === "deliveries") {
+        const row = await tx.delivery.findFirst({ where: { id, tenantId: access.tenantId }, select: { id: true, status: true, dispatchedAt: true, completedAt: true } });
+        if (!row) return { kind: "NOT_FOUND" as const };
+        if (row.status !== "PENDING" || row.dispatchedAt || row.completedAt) {
+          return { kind: "IN_USE" as const, reason: "Only an un-dispatched pending delivery can be deleted. Dispatched or completed deliveries must remain in the audit trail." };
+        }
+        await tx.delivery.delete({ where: { id: row.id } });
+      } else if (resource === "customer-follow-ups") {
+        const row = await tx.customerFollowUp.findFirst({ where: { id, tenantId: access.tenantId }, select: { id: true } });
+        if (!row) return { kind: "NOT_FOUND" as const };
+        await tx.customerFollowUp.delete({ where: { id: row.id } });
+      } else if (resource === "permissions") {
+        const row = await tx.rolePermission.findFirst({ where: { id, tenantId: access.tenantId }, select: { id: true } });
+        if (!row) return { kind: "NOT_FOUND" as const };
+        await tx.rolePermission.delete({ where: { id: row.id } });
+        entityType = "ROLE_PERMISSION";
+      } else {
+        const messages: Record<string, string> = {
+          "goods-receipts": "Goods receipts are inventory and accounting evidence. Reverse a posted receipt with a reason instead of deleting it.",
+          "customer-receipts": "Customer receipts are financial history. Use the audited reversal action instead of deleting them.",
+          "supplier-bills": "Supplier bills are financial history. Correct or settle them through the supplier-bill workflow instead of deleting them.",
+          "supplier-payments": "Supplier payments are financial history. Use the audited reversal workflow instead of deleting them.",
+          inventory: "Inventory movements are append-only audit history and cannot be deleted.",
+          ledger: "Ledger entries are immutable accounting evidence and cannot be deleted.",
+        };
+        const rowExists = resource === "goods-receipts"
+          ? await tx.goodsReceipt.findFirst({ where: { id, tenantId: access.tenantId }, select: { id: true } })
+          : resource === "customer-receipts"
+          ? await tx.customerReceipt.findFirst({ where: { id, tenantId: access.tenantId }, select: { id: true } })
+          : resource === "supplier-bills"
+          ? await tx.supplierBill.findFirst({ where: { id, tenantId: access.tenantId }, select: { id: true } })
+          : resource === "supplier-payments"
+          ? await tx.supplierPayment.findFirst({ where: { id, tenantId: access.tenantId }, select: { id: true } })
+          : resource === "inventory"
+          ? await tx.inventoryMovement.findFirst({ where: { id, tenantId: access.tenantId }, select: { id: true } })
+          : await tx.ledgerEntry.findFirst({ where: { id, tenantId: access.tenantId }, select: { id: true } });
+        if (!rowExists) return { kind: "NOT_FOUND" as const };
+        return { kind: "IMMUTABLE" as const, reason: messages[resource] || "This record cannot be deleted." };
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: access.user.id,
+          action: "DELETE",
+          entityType,
+          entityId: id,
+          metadata: { tenantId: access.tenantId, workspaceScoped: true },
+        },
+      });
+      return { kind: "DELETED" as const };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    if (result.kind === "NOT_FOUND") return fail(404, "Record not found in this workspace.");
+    if (result.kind === "IN_USE" || result.kind === "IMMUTABLE") return fail(409, result.reason);
+    return Response.json({ data: { id, deleted: true } }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    const code = (error as { code?: string })?.code;
+    if (code === "P2003" || code === "P2014") return fail(409, "This record is linked to existing business history and cannot be deleted.");
+    if (code === "P2034") return fail(409, "Another transaction changed this record. Refresh the list and retry.");
+    console.error("Operations delete failed.", resource, code || "UNKNOWN");
+    return fail(500, "Could not delete the record. No intentional data change was made; refresh and retry.");
   }
 }

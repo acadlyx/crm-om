@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getPlatformBranding, cacheBustedAssetUrl } from "@/lib/branding/service";
 import "./globals.css";
+import { AyzentCredit } from "@/components/ayzent-credit";
 
 export const dynamic = "force-dynamic";
 
@@ -18,5 +19,5 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const branding = await getPlatformBranding();
-  return <html lang="en"><body style={{ "--brand-primary": branding.primaryColor } as React.CSSProperties}>{children}</body></html>;
+  return <html lang="en"><body style={{ "--brand-primary": branding.primaryColor } as React.CSSProperties}>{children}<AyzentCredit /></body></html>;
 }

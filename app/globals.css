@@ -686,3 +686,39 @@ a { color:inherit; text-decoration:none; }
   .invoice-document,.invoice-bill-to,.invoice-total-card { break-inside:avoid; }
   @page { size:A4; margin:14mm; }
 }
+
+
+/* Ayzent Solutions development and maintenance attribution */
+.ayzent-credit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  width: 100%;
+  padding: 13px 20px;
+  border-top: 1px solid #e4e8e5;
+  background: #f8faf8;
+  color: #68746e;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+.ayzent-credit a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #176b4d;
+  font-weight: 650;
+  text-decoration: none;
+}
+.ayzent-credit a:hover { text-decoration: underline; }
+.ayzent-credit a:focus-visible {
+  outline: 2px solid #176b4d;
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.ayzent-credit-separator { color: #aab4ae; }
+@media (max-width: 560px) {
+  .ayzent-credit { gap: 5px 7px; padding: 12px 14px; font-size: 11px; }
+}
