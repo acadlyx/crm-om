@@ -139,7 +139,7 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       rows = records.map((item) => ({
         id: item.id, name: item.name, company: item.company, email: item.email, phone: item.phone,
         address: Array.isArray(item.addresses) ? item.addresses.map(String).join(", ") : "",
-        creditLimit: Number(item.creditLimit), paymentTermsDays: item.paymentTermsDays,
+        creditLimit: Number(item.creditLimit), paymentTermsDays: item.paymentTermsDays, notes: item.notes,
         status: item.status, createdAt: item.createdAt.toISOString(),
       }));
       fields = [
