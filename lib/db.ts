@@ -4,16 +4,28 @@ import { PrismaClient } from "../generated/prisma/client";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-function createPrisma() {
-  // Keep module initialization safe so public branding shells can fall back while the DB is unavailable.
-  const connectionString = process.env.DATABASE_URL ||
+function getRuntimeConnectionString() {
+  const configured = process.env.DATABASE_URL ||
     "postgresql://missing:missing@127.0.0.1:1/crm_om_not_configured";
 
-  // Vercel serverless instances each own a pool. A small pool prevents every
-  // instance from opening the adapter's default 10 connections against Prisma Postgres.
+  // Prisma Postgres provides separate direct and pooled hostnames. Serverless
+  // app traffic must use the pooler; prisma.config.ts continues to use the
+  // configured direct URL for migration/admin commands.
+  try {
+    const url = new URL(configured);
+    if (url.hostname === "db.prisma.io") {
+      url.hostname = "pooled.db.prisma.io";
+    }
+    return url.toString();
+  } catch {
+    return configured;
+  }
+}
+
+function createPrisma() {
   return new PrismaClient({
     adapter: new PrismaPg({
-      connectionString,
+      connectionString: getRuntimeConnectionString(),
       max: 1,
       connectionTimeoutMillis: 5_000,
       idleTimeoutMillis: 10_000,
@@ -22,7 +34,7 @@ function createPrisma() {
   });
 }
 
-// Cache at the runtime-global level so every module bundle in a warm instance
-// reuses the same client; do not disconnect between serverless invocations.
+// Cache at runtime-global level so every module bundle in a warm instance
+// reuses the same client. Keep it alive across serverless invocations.
 export const db = globalForPrisma.prisma ?? createPrisma();
 globalForPrisma.prisma = db;
