@@ -376,13 +376,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
           const paid = legacyPaid + receiptsPaid;
           const status = paid + 0.005 >= n(invoice.total) ? "PAID" : paid > 0 ? "PARTIALLY_PAID" : invoice.status === "DRAFT" ? "DRAFT" : invoice.dueDate < new Date() ? "OVERDUE" : "SENT";
           await tx.invoice.update({ where: { id: invoice.id }, data: { status } });
-          await tx.ledgerEntry.create({ data: {
-            tenantId, customerId: receipt.customerId, entryType: "CUSTOMER_RECEIPT_REVERSAL",
-            referenceType: "CUSTOMER_RECEIPT", referenceId: receipt.id,
-            description: "Reversal of receipt allocation for invoice " + invoice.invoiceNumber,
-            debit: allocation.amount, credit: 0, idempotencyKey: "receipt-reversal-" + receipt.id + "-" + invoice.id, createdByUserId: actorId,
-          } });
         }
+        await tx.ledgerEntry.create({ data: {
+          tenantId, customerId: receipt.customerId, entryType: "CUSTOMER_RECEIPT_REVERSAL",
+          referenceType: "CUSTOMER_RECEIPT", referenceId: receipt.id,
+          description: "Reversal of customer receipt " + id + ": " + parsed.data.reason,
+          debit: receipt.amount, credit: 0, idempotencyKey: "receipt-reversal-" + receipt.id, createdByUserId: actorId,
+        } });
         await audit(tx, actorId, "CUSTOMER_RECEIPT_REVERSED", "CustomerReceipt", id, { amount: n(receipt.amount), reason: parsed.data.reason });
         return "UPDATED";
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -407,13 +407,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
           const paid = bill.allocations.filter((entry) => entry.payment.status === "POSTED").reduce((sum, entry) => sum + n(entry.amount), 0);
           const remaining = n(bill.total) - paid;
           await tx.supplierBill.update({ where: { id: bill.id }, data: { status: remaining <= 0.005 ? "PAID" : paid > 0 ? "PARTIALLY_PAID" : "OPEN" } });
-          await tx.ledgerEntry.create({ data: {
-            tenantId, supplierId: payment.supplierId, entryType: "SUPPLIER_PAYMENT_REVERSAL",
-            referenceType: "SUPPLIER_PAYMENT", referenceId: payment.id,
-            description: "Reversal of supplier payment allocation for bill " + bill.billNumber,
-            debit: 0, credit: allocation.amount, idempotencyKey: "supplier-payment-reversal-" + payment.id + "-" + bill.id, createdByUserId: actorId,
-          } });
         }
+        await tx.ledgerEntry.create({ data: {
+          tenantId, supplierId: payment.supplierId, entryType: "SUPPLIER_PAYMENT_REVERSAL",
+          referenceType: "SUPPLIER_PAYMENT", referenceId: payment.id,
+          description: "Reversal of supplier payment " + id + ": " + parsed.data.reason,
+          debit: 0, credit: payment.amount, idempotencyKey: "supplier-payment-reversal-" + payment.id, createdByUserId: actorId,
+        } });
         await audit(tx, actorId, "SUPPLIER_PAYMENT_REVERSED", "SupplierPayment", id, { amount: n(payment.amount), reason: parsed.data.reason });
         return "UPDATED";
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
