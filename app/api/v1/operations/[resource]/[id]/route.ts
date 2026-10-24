@@ -387,13 +387,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
             idempotencyKey: "delivery-cogs-" + delivery.id + "-" + orderItem.id, createdByUserId: actorId,
           } });
         }
-        const updated = await tx.delivery.update({ where: { id }, data: {
-          status: nextStatus, completedAt: new Date(), proofOfDelivery: parsed.data.proofOfDelivery ?? null,
-        } });
         const orderId = delivery.orderId;
         const orderItems = await tx.salesOrderItem.findMany({ where: { orderId } });
         const complete = orderItems.length > 0 && orderItems.every((item) => n(item.deliveredQuantity) >= n(item.quantity) - 0.000001);
         const anyDelivered = orderItems.some((item) => n(item.deliveredQuantity) > 0);
+        const actualDeliveryStatus = complete ? "DELIVERED" : "PARTIALLY_DELIVERED";
+        const updated = await tx.delivery.update({ where: { id }, data: {
+          status: actualDeliveryStatus, completedAt: new Date(), proofOfDelivery: parsed.data.proofOfDelivery ?? null,
+        } });
         await tx.salesOrder.update({ where: { id: orderId }, data: { status: complete ? "DELIVERED" : anyDelivered ? "PARTIALLY_DELIVERED" : "CONFIRMED" } });
         await audit(tx, actorId, "DELIVERY_POSTED", "Delivery", id, { status: updated.status, lineCount: delivery.items.length });
         return "UPDATED";
