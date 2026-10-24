@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Prisma } from "@/generated/prisma/client";
 import { requireWorkspaceAccess, writeAuditEvent } from "@/lib/crm/access";
 import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { db } from "@/lib/db";
