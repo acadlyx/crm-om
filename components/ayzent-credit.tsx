@@ -1,17 +1,16 @@
 import { ArrowUpRight } from "lucide-react";
 
-const AYZENT_SOURCE_URL = "https://github.com/ayzentsolutions/ayzent-solutions";
+const AYZENT_WEBSITE_URL = "https://www.ayzentsolutions.com";
 const AYZENT_VERCEL_URL = process.env.NEXT_PUBLIC_AYZENT_VERCEL_URL?.trim();
 
 export function AyzentCredit() {
-  const ayzentUrl = AYZENT_VERCEL_URL || AYZENT_SOURCE_URL;
   return (
     <footer
       className="ayzent-credit"
       aria-label="Platform development and maintenance credit"
     >
       <span>Designed, developed and maintained by</span>
-      <a href={ayzentUrl} target="_blank" rel="noopener noreferrer">
+      <a href={AYZENT_WEBSITE_URL} target="_blank" rel="noopener noreferrer">
         Ayzent Solutions <ArrowUpRight size={13} aria-hidden="true" />
       </a>
       <span className="ayzent-credit-separator" aria-hidden="true">·</span>
@@ -20,9 +19,9 @@ export function AyzentCredit() {
           View Ayzent on Vercel <ArrowUpRight size={13} aria-hidden="true" />
         </a>
       ) : (
-        <span className="ayzent-credit-config-note" title="Set NEXT_PUBLIC_AYZENT_VERCEL_URL to the verified Ayzent deployment URL.">
-          Vercel deployment link needs configuration
-        </span>
+        <a href={AYZENT_WEBSITE_URL} target="_blank" rel="noopener noreferrer" title="Set NEXT_PUBLIC_AYZENT_VERCEL_URL to the direct Vercel deployment URL.">
+          Visit Ayzent website <ArrowUpRight size={13} aria-hidden="true" />
+        </a>
       )}
     </footer>
   );
