@@ -481,13 +481,13 @@ export async function POST(request: Request, context: { params: Promise<{ resour
           const receiptsPaid = invoice.receiptAllocations.filter((entry) => entry.receipt.status === "POSTED").reduce((sum, entry) => sum + number(entry.amount), 0);
           const paidAfter = legacyPaid + receiptsPaid;
           await tx.invoice.update({ where: { id: invoice.id }, data: { status: paidAfter + 0.005 >= number(invoice.total) ? "PAID" : "PARTIALLY_PAID" } });
-          await tx.ledgerEntry.create({ data: {
-            tenantId, customerId: customer.id, entryType: "CUSTOMER_RECEIPT",
-            referenceType: "CUSTOMER_RECEIPT", referenceId: receipt.id,
-            description: "Customer receipt " + receipt.receiptNumber + " allocated to invoice " + invoice.invoiceNumber,
-            debit: 0, credit: allocation.amount, idempotencyKey: "receipt-" + receipt.id + "-" + invoice.id, createdByUserId: actorId,
-          } });
         }
+        await tx.ledgerEntry.create({ data: {
+          tenantId, customerId: customer.id, entryType: "CUSTOMER_RECEIPT",
+          referenceType: "CUSTOMER_RECEIPT", referenceId: receipt.id,
+          description: "Customer receipt " + receipt.receiptNumber,
+          debit: 0, credit: receipt.amount, idempotencyKey: "receipt-" + receipt.id, createdByUserId: actorId,
+        } });
         await audit(tx, actorId, "CUSTOMER_RECEIPT_POSTED", "CustomerReceipt", receipt.id, { amount: data.amount, allocationTotal });
         return { existing: false, receipt };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -549,13 +549,13 @@ export async function POST(request: Request, context: { params: Promise<{ resour
           if (!bill) throw new Error("BILL_NOT_FOUND");
           const paidAfter = bill.allocations.filter((entry) => entry.payment.status === "POSTED").reduce((sum, entry) => sum + number(entry.amount), 0);
           await tx.supplierBill.update({ where: { id: bill.id }, data: { status: paidAfter + 0.005 >= number(bill.total) ? "PAID" : "PARTIALLY_PAID" } });
-          await tx.ledgerEntry.create({ data: {
-            tenantId, supplierId: supplier.id, entryType: "SUPPLIER_PAYMENT",
-            referenceType: "SUPPLIER_PAYMENT", referenceId: payment.id,
-            description: "Supplier payment allocated to bill " + bill.billNumber,
-            debit: allocation.amount, credit: 0, idempotencyKey: "supplier-payment-" + payment.id + "-" + bill.id, createdByUserId: actorId,
-          } });
         }
+        await tx.ledgerEntry.create({ data: {
+          tenantId, supplierId: supplier.id, entryType: "SUPPLIER_PAYMENT",
+          referenceType: "SUPPLIER_PAYMENT", referenceId: payment.id,
+          description: "Supplier payment " + payment.id,
+          debit: payment.amount, credit: 0, idempotencyKey: "supplier-payment-" + payment.id, createdByUserId: actorId,
+        } });
         await audit(tx, actorId, "SUPPLIER_PAYMENT_POSTED", "SupplierPayment", payment.id, { amount: data.amount, allocated });
         return { existing: false, payment };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
