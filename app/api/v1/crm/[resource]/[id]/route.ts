@@ -174,9 +174,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
     if (!updated?.count) return Response.json({ error: { message: "Record not found in this workspace." } }, { status: 404 });
     await writeAuditEvent({
       actorUserId: access.user.id,
-      action: "UPDATE_STATUS",
+      action: resource === "customers" && !("status" in body) ? "UPDATE_PROFILE" : "UPDATE_STATUS",
       entityType: resource.slice(0, -1).toUpperCase(),
       entityId: id,
+      metadata: resource === "customers" ? { fields: Object.keys(body).sort() } : undefined,
     });
     return Response.json({ data: { id, updated: true } });
   } catch (error) {
