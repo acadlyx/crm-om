@@ -38,7 +38,7 @@ export function TeamModule() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/v1/operations/team", { cache: "no-store" });
+      const response = await fetch("/api/v1/operations/team?includeInactive=true", { cache: "no-store" });
       const result = await response.json();
       if (!response.ok) throw new Error(result?.error?.message || "Could not load team members.");
       setMembers(result.data || []);
