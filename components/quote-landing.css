@@ -33,7 +33,18 @@
   touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
 }
-.quote-canvas:focus-visible { outline: 2px solid currentColor; outline-offset: -12px; }
+.quote-canvas { cursor: default; }
+.quote-text {
+  appearance: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+.quote-text:focus-visible { outline: 2px solid currentColor; outline-offset: 8px; }
 .quote-text {
   position: relative;
   z-index: 2;

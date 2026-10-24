@@ -60,11 +60,8 @@ export function QuoteLanding() {
 
   return (
     <main className={"quote-landing design-" + designs[designIndex]}>
-      <button
-        type="button"
+      <div
         className="quote-canvas"
-        aria-label="Change the quote design. Swipe left for another quote."
-        onClick={changeDesign}
         onPointerDown={(event) => {
           pointerStart.current = { x: event.clientX, y: event.clientY };
           suppressClick.current = false;
@@ -92,8 +89,16 @@ export function QuoteLanding() {
         }}
       >
         <span className="quote-decoration" aria-hidden="true" />
-        <span className="quote-text" key={quoteIndex}>{quotes[quoteIndex]}</span>
-      </button>
+        <button
+          type="button"
+          className="quote-text"
+          aria-label="Change the quote design. Swipe left for another quote."
+          onClick={changeDesign}
+          key={quoteIndex}
+        >
+          {quotes[quoteIndex]}
+        </button>
+      </div>
     </main>
   );
 }
