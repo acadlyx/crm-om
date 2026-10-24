@@ -124,9 +124,30 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
     }
 
     if (resource === "customers") {
-      const parsed = z.object({ status: z.enum(["ACTIVE", "INACTIVE"]) }).safeParse(body);
-      if (!parsed.success) return Response.json({ error: { message: "Choose a valid customer status." } }, { status: 400 });
-      updated = await db.customer.updateMany({ where: { id, tenantId: access.tenantId }, data: { status: parsed.data.status } });
+      const parsed = z.object({
+        name: z.string().trim().min(1).max(160).optional(),
+        company: z.preprocess((value) => value === "" || value === null ? undefined : value, z.string().trim().max(200).optional()),
+        email: z.preprocess((value) => value === "" || value === null ? undefined : value, z.string().trim().email().max(320).optional()),
+        phone: z.preprocess((value) => value === "" || value === null ? undefined : value, z.string().trim().max(40).optional()),
+        address: z.preprocess((value) => value === "" || value === null ? undefined : value, z.string().trim().max(1000).optional()),
+        creditLimit: z.coerce.number().finite().min(0).max(9999999999).refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7, "Credit limits may have at most two decimal places.").optional(),
+        paymentTermsDays: z.coerce.number().int().min(0).max(365).optional(),
+        notes: z.preprocess((value) => value === "" || value === null ? undefined : value, z.string().trim().max(2000).optional()),
+        status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
+      }).strict().safeParse(body);
+      if (!parsed.success) return Response.json({ error: { message: parsed.error.issues[0]?.message || "Check customer details." } }, { status: 400 });
+      const patch: Record<string, unknown> = {};
+      if ("name" in body) patch.name = parsed.data.name;
+      if ("company" in body) patch.company = parsed.data.company ?? null;
+      if ("email" in body) patch.email = parsed.data.email?.toLowerCase() ?? null;
+      if ("phone" in body) patch.phone = parsed.data.phone ?? null;
+      if ("address" in body) patch.addresses = parsed.data.address ? [parsed.data.address] : [];
+      if ("creditLimit" in body) patch.creditLimit = parsed.data.creditLimit ?? 0;
+      if ("paymentTermsDays" in body) patch.paymentTermsDays = parsed.data.paymentTermsDays ?? 0;
+      if ("notes" in body) patch.notes = parsed.data.notes ?? null;
+      if ("status" in body) patch.status = parsed.data.status;
+      if (Object.keys(patch).length === 0) return Response.json({ error: { message: "Supply at least one editable customer field." } }, { status: 400 });
+      updated = await db.customer.updateMany({ where: { id, tenantId: access.tenantId }, data: patch as never });
     } else if (resource === "leads") {
       const parsed = z.object({ status: z.enum(["NEW", "CONTACTED", "QUALIFIED", "CONVERTED", "LOST"]) }).safeParse(body);
       if (!parsed.success) return Response.json({ error: { message: "Choose a valid lead status." } }, { status: 400 });
