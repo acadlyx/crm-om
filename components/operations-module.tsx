@@ -186,12 +186,14 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
     setCatalogs((current) => ({ ...current, ...Object.fromEntries(loaded) }));
   }, [resource]);
 
-  // The loaders perform asynchronous fetches; their state updates happen only after the network resolves.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // The loaders perform asynchronous fetches; state changes only after network responses. The hook
+  // lint rule sees the call graph and flags the call site despite the async boundary.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     void loadRows();
     void loadCatalogs().catch((cause) => setError(cause instanceof Error ? cause.message : "Could not load form options."));
   }, [loadRows, loadCatalogs]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
