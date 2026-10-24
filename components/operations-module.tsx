@@ -366,6 +366,20 @@ export function OperationsModule({ resource, owner, canUpdate = false }: { resou
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function startEditMaster(row: Row) {
+    setError("");
+    setNotice("");
+    setEditingOrder(null);
+    setEditingMaster(row);
+    setFormOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function handleEditRow(row: Row) {
+    if (resource === "sales-orders") startEditOrder(row);
+    else if (resource === "products" || resource === "suppliers") startEditMaster(row);
+  }
+
   async function issueInvoice(row: Row) {
     if (!window.confirm("Issue a customer invoice from order " + row.orderNumber + "? This will create a financial record and prevent the order from being cancelled.")) return;
     setNotice("");
@@ -440,7 +454,7 @@ export function OperationsModule({ resource, owner, canUpdate = false }: { resou
       {error && <p className="workspace-form-message is-error" role="alert"><AlertCircle size={16} />{error}</p>}
 
       {formOpen && config.writable && <section className="card operations-form-card">
-        <div className="owner-panel-heading"><div><p className="dashboard-eyebrow">{editingOrder ? "EDIT DRAFT" : "NEW RECORD"}</p><h2>{editingOrder ? "Edit draft " + editingOrder.orderNumber : resource === "goods-receipts" ? "Post goods received" : resource === "deliveries" ? "Create delivery" : resource === "customer-receipts" ? "Record customer receipt" : "Add " + config.title.toLowerCase()}</h2></div><button className="crm-secondary-button" type="button" onClick={() => { setFormOpen(false); setEditingOrder(null); }}><X size={15} />Close</button></div>
+        <div className="owner-panel-heading"><div><p className="dashboard-eyebrow">{editingMaster || editingOrder ? "EDIT RECORD" : "NEW RECORD"}</p><h2>{editingMaster ? "Edit " + (resource === "products" ? "product" : "supplier") : editingOrder ? "Edit draft " + editingOrder.orderNumber : resource === "goods-receipts" ? "Post goods received" : resource === "deliveries" ? "Create delivery" : resource === "customer-receipts" ? "Record customer receipt" : "Add " + config.title.toLowerCase()}</h2></div><button className="crm-secondary-button" type="button" onClick={() => { setFormOpen(false); setEditingOrder(null); setEditingMaster(null); }}><X size={15} />Close</button></div>
         <form className="operations-create-form" onSubmit={submit}>
           {resource === "products" && <>
             <div className="operations-form-grid">
@@ -568,7 +582,7 @@ export function OperationsModule({ resource, owner, canUpdate = false }: { resou
             </div>
             <p className="owner-footnote">Overrides are checked server-side. Only the business owner can change them. A deny or allow override replaces the role default for that module/action.</p>
           </>}
-          <div className="crm-form-actions"><button className="brand-button" type="submit" disabled={busy}>{busy ? <LoaderCircle className="workspace-spinner" size={16} /> : <Plus size={16} />}{busy ? "Saving…" : editingOrder ? "Update draft order" : "Save record"}</button><button type="button" className="crm-secondary-button" onClick={() => { setFormOpen(false); setEditingOrder(null); }}>Cancel</button></div>
+          <div className="crm-form-actions"><button className="brand-button" type="submit" disabled={busy}>{busy ? <LoaderCircle className="workspace-spinner" size={16} /> : <Plus size={16} />}{busy ? "Saving…" : editingMaster ? "Save changes" : editingOrder ? "Update draft order" : "Save record"}</button><button type="button" className="crm-secondary-button" onClick={() => { setFormOpen(false); setEditingOrder(null); setEditingMaster(null); }}>Cancel</button></div>
         </form>
       </section>}
 
@@ -585,7 +599,7 @@ export function OperationsModule({ resource, owner, canUpdate = false }: { resou
           : filtered.length === 0 ? <div className="dashboard-empty"><span className="dashboard-empty-icon"><Search size={18} /></span><strong>{search || statusFilter !== "ALL" ? "No records match your filters" : "Nothing has been recorded yet"}</strong><p>{error || (search || statusFilter !== "ALL" ? "Change the search or status filter and try again." : config.empty)}</p></div>
           : <>
             <div className="workspace-table-wrap"><table className="workspace-table operations-table"><thead><tr>{config.columns.map((column) => <th key={column.key}>{column.label}</th>)}<th>Actions</th></tr></thead>
-              <tbody>{filtered.slice(0, visibleCount).map((row) => <tr key={row.id}>{config.columns.map((column) => <td key={column.key}><Cell row={row} column={column} /></td>)}<td><RowActions resource={resource} row={row} owner={owner} onChange={changeStatus} onUpdate={updateRow} onInvoice={issueInvoice} onEdit={startEditOrder} /></td></tr>)}</tbody>
+              <tbody>{filtered.slice(0, visibleCount).map((row) => <tr key={row.id}>{config.columns.map((column) => <td key={column.key}><Cell row={row} column={column} /></td>)}<td><RowActions resource={resource} row={row} owner={owner} canUpdate={canUpdate} onChange={changeStatus} onUpdate={updateRow} onInvoice={issueInvoice} onEdit={handleEditRow} /></td></tr>)}</tbody>
             </table></div>
             <div className="operations-table-footer"><span>Showing {Math.min(visibleCount, filtered.length)} of {filtered.length} matching records</span>
               {filtered.length > visibleCount && <button className="crm-secondary-button" type="button" onClick={() => setVisibleCount((count) => Math.min(filtered.length, count + 20))}>Show more ({filtered.length - visibleCount} remaining) <ArrowRight size={14} /></button>}
