@@ -409,7 +409,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
       {error && <p className="workspace-form-message is-error" role="alert"><AlertCircle size={16} />{error}</p>}
 
       {formOpen && config.writable && <section className="card operations-form-card">
-        <div className="owner-panel-heading"><div><p className="dashboard-eyebrow">NEW RECORD</p><h2>{resource === "goods-receipts" ? "Post goods received" : resource === "deliveries" ? "Create delivery" : resource === "customer-receipts" ? "Record customer receipt" : "Add " + config.title.toLowerCase()}</h2></div><button className="crm-secondary-button" type="button" onClick={() => setFormOpen(false)}><X size={15} />Close</button></div>
+        <div className="owner-panel-heading"><div><p className="dashboard-eyebrow">{editingOrder ? "EDIT DRAFT" : "NEW RECORD"}</p><h2>{editingOrder ? "Edit draft " + editingOrder.orderNumber : resource === "goods-receipts" ? "Post goods received" : resource === "deliveries" ? "Create delivery" : resource === "customer-receipts" ? "Record customer receipt" : "Add " + config.title.toLowerCase()}</h2></div><button className="crm-secondary-button" type="button" onClick={() => { setFormOpen(false); setEditingOrder(null); }}><X size={15} />Close</button></div>
         <form className="operations-create-form" onSubmit={submit}>
           {resource === "products" && <>
             <div className="operations-form-grid">
@@ -436,11 +436,11 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
           </div>}
           {resource === "sales-orders" && <>
             <div className="operations-form-grid">
-              <SelectField name="customerId" label="Customer *" required options={customerOptions} placeholder="Select customer" />
-              <TextField name="orderDate" label="Order date" type="date" />
-              <TextField name="expectedDeliveryAt" label="Expected delivery" type="datetime-local" />
-              <SelectField name="status" label="Initial status" options={[{ value: "DRAFT", label: "Draft" }, { value: "CONFIRMED", label: "Confirmed" }]} defaultValue="DRAFT" />
-              <TextField name="notes" label="Order notes" placeholder="Optional notes" />
+              <SelectField name="customerId" label="Customer *" required options={customerOptions} placeholder="Select customer" defaultValue={editingOrder?.customerId || ""} />
+              <TextField name="orderDate" label="Order date" type="date" defaultValue={editingOrder?.orderDate ? new Date(editingOrder.orderDate).toISOString().slice(0, 10) : undefined} />
+              <TextField name="expectedDeliveryAt" label="Expected delivery" type="datetime-local" defaultValue={editingOrder?.expectedDeliveryAt ? new Date(editingOrder.expectedDeliveryAt).toISOString().slice(0, 16) : undefined} />
+              {!editingOrder && <SelectField name="status" label="Initial status" options={[{ value: "DRAFT", label: "Draft" }, { value: "CONFIRMED", label: "Confirmed" }]} defaultValue="DRAFT" />}
+              <TextField name="notes" label="Order notes" placeholder="Optional notes" defaultValue={editingOrder?.notes || ""} />
             </div>
             <LineEditor title="Order items" lines={orderLines} setLines={setOrderLines} onEmpty={() => setOrderLines((items) => [...items, { productId: "", quantity: "1", discountPercent: "0", taxPercent: "0" }])} productOptions={productOptions} mode="sales" />
           </>}
@@ -538,7 +538,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
             </div>
             <p className="owner-footnote">Overrides are checked server-side. Only the business owner can change them. A deny or allow override replaces the role default for that module/action.</p>
           </>}
-          <div className="crm-form-actions"><button className="brand-button" type="submit" disabled={busy}>{busy ? <LoaderCircle className="workspace-spinner" size={16} /> : <Plus size={16} />}{busy ? "Saving…" : "Save record"}</button><button type="button" className="crm-secondary-button" onClick={() => setFormOpen(false)}>Cancel</button></div>
+          <div className="crm-form-actions"><button className="brand-button" type="submit" disabled={busy}>{busy ? <LoaderCircle className="workspace-spinner" size={16} /> : <Plus size={16} />}{busy ? "Saving…" : editingOrder ? "Update draft order" : "Save record"}</button><button type="button" className="crm-secondary-button" onClick={() => { setFormOpen(false); setEditingOrder(null); }}>Cancel</button></div>
         </form>
       </section>}
 
