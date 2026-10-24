@@ -206,7 +206,7 @@ export function CrmModule({
             {!query && <button type="button" className="dashboard-text-link crm-empty-add" onClick={() => setOpen(true)}>Add your first record <ArrowRight size={15} /></button>}
           </div>
         )}
-        <p className="crm-table-footnote"><ArrowUpRight size={13} />Records are isolated to your business workspace. No other company's data is shown.</p>
+        <p className="crm-table-footnote"><ArrowUpRight size={13} />Records are isolated to your business workspace. No other company&apos;s data is shown.</p>
       </section>
     </div>
   );
