@@ -91,7 +91,7 @@ export async function POST(request: Request) {
       }
 
       let customerId = values.customerId ?? null;
-      let invoiceId = values.invoiceId ?? null;
+      const invoiceId = values.invoiceId ?? null;
       if (invoiceId) {
         const invoice = await tx.invoice.findFirst({
           where: { id: invoiceId, tenantId: access.tenantId },
