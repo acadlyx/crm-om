@@ -107,6 +107,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [visibleCount, setVisibleCount] = useState(3);
   const [formOpen, setFormOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<Row | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [orderLines, setOrderLines] = useState([{ productId: "", quantity: "1", discountPercent: "0", taxPercent: "0" }]);
