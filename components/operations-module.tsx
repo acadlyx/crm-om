@@ -737,7 +737,13 @@ function RowActions({ resource, row, owner, canUpdate, onChange, onUpdate, onInv
       <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"CANCELLED")}>Cancel</button>
     </>}
   </div>;
-  if (["goods-receipts","customer-receipts","supplier-payments"].includes(resource) && row.status === "POSTED" && owner) {
+  if (resource === "customer-receipts") return <div className="operations-row-actions">
+    <a className="crm-secondary-button" href={"/api/v1/operations/customer-receipts/" + encodeURIComponent(row.id) + "/pdf"} download>
+      <ArrowDownToLine size={14} /> Download PDF
+    </a>
+    {owner && row.status === "POSTED" && <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"REVERSED")}>Reverse</button>}
+  </div>;
+  if (["goods-receipts","supplier-payments"].includes(resource) && row.status === "POSTED" && owner) {
     return <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"REVERSED")}>Reverse</button>;
   }
   if (resource === "customer-follow-ups" && row.status === "OPEN") return <div className="operations-row-actions">
