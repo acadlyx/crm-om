@@ -51,7 +51,7 @@ function display(value: unknown, key: string) {
 }
 
 export function CrmModule({
-  resource, title, description, fields, columns, initialRows, workflow, recordLabel,
+  resource, title, description, fields, columns, initialRows, workflow, recordLabel, owner = false,
 }: {
   resource: string;
   title: string;
@@ -61,6 +61,7 @@ export function CrmModule({
   initialRows: CrmRow[];
   workflow?: Workflow;
   recordLabel?: string;
+  owner?: boolean;
 }) {
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
@@ -134,6 +135,36 @@ export function CrmModule({
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not update this record.");
+    } finally {
+      setBusyRow("");
+    }
+  }
+
+  async function reversePayment(row: CrmRow) {
+    if (row.status !== "POSTED") return;
+    const reason = window.prompt("Enter the reason for reversing payment " + String(row.reference || row.id) + " (required):");
+    if (!reason || reason.trim().length < 3) {
+      setError("A reversal reason of at least 3 characters is required.");
+      return;
+    }
+    if (!window.confirm("Reverse this posted payment? The invoice balance will be recalculated and the action will be audited.")) return;
+    setBusyRow(row.id);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/v1/crm/payments/" + encodeURIComponent(row.id), {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify({ status: "REVERSED", reason: reason.trim() }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error?.message || "Could not reverse this payment.");
+      setRows((current) => current.map((item) => item.id === row.id ? { ...item, status: "REVERSED" } : item));
+      setNotice("Payment reversed. The invoice balance and customer ledger were updated.");
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not reverse this payment.");
     } finally {
       setBusyRow("");
     }
@@ -213,7 +244,7 @@ export function CrmModule({
         </div>
         {filteredRows.length ? (
           <div className="crm-table-wrap"><table className="crm-table">
-            <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}{workflow && <th>{workflow.label}</th>}</tr></thead>
+            <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}{workflow && <th>{workflow.label}</th>}{resource === "payments" && owner && <th>Actions</th>}</tr></thead>
             <tbody>{filteredRows.slice(0, visibleCount).map((row) => (
               <tr key={row.id}>
                 {columns.map((column, index) => {
@@ -224,6 +255,9 @@ export function CrmModule({
                 {workflow && <td><select className="crm-workflow-select" value={String(row[workflow.field] || "")} disabled={busyRow === row.id} onChange={(event) => updateWorkflow(row, event.target.value)} aria-label={workflow.label + " for " + String(row[columns[0]?.key] || "record")}>
                   {workflow.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>{busyRow === row.id && <LoaderCircle size={13} className="workspace-spinner crm-inline-spinner" />}</td>}
+                {resource === "payments" && owner && <td>{row.status === "POSTED"
+                  ? <button type="button" className="crm-secondary-button is-danger" disabled={busyRow === row.id} onClick={() => void reversePayment(row)}>{busyRow === row.id ? <LoaderCircle size={13} className="workspace-spinner" /> : "Reverse payment"}</button>
+                  : <span className="crm-pill crm-pill-overdue">Reversed</span>}</td>}
               </tr>
             ))}</tbody>
           </table></div>
