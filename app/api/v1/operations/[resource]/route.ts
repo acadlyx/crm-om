@@ -286,11 +286,12 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         if (existing) return { existing: true, order: existing };
         const customer = await tx.customer.findFirst({ where: { id: data.customerId, tenantId, status: "ACTIVE" } });
         if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
-        const productIds = [...new Set(data.items.map((item: {productId: string}) => item.productId))];
+        const salesItems = data.items as Array<{ productId: string; quantity: number; discountPercent: number; taxPercent: number }>;
+        const productIds: string[] = Array.from(new Set<string>(salesItems.map((item) => item.productId)));
         const products = await tx.product.findMany({ where: { tenantId, id: { in: productIds }, status: "ACTIVE" } });
         if (products.length !== productIds.length) throw new Error("PRODUCT_NOT_FOUND");
         const byId = new Map(products.map((product) => [product.id, product]));
-        const prepared = data.items.map((item: {productId: string; quantity: number; discountPercent: number; taxPercent: number}) => {
+        const prepared: Array<{ product: (typeof products)[number]; quantity: number; gross: number; discount: number; tax: number; total: number }> = salesItems.map((item) => {
           const product = byId.get(item.productId)!;
           const gross = round2(item.quantity * number(product.sellingPrice));
           const discount = round2(gross * item.discountPercent / 100);
@@ -323,11 +324,12 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         if (existing) return { existing: true, order: existing };
         const supplier = await tx.supplier.findFirst({ where: { id: data.supplierId, tenantId, status: "ACTIVE" } });
         if (!supplier) throw new Error("SUPPLIER_NOT_FOUND");
-        const productIds = [...new Set(data.items.map((item: {productId: string}) => item.productId))];
+        const purchaseItems = data.items as Array<{ productId: string; quantity: number }>;
+        const productIds: string[] = Array.from(new Set<string>(purchaseItems.map((item) => item.productId)));
         const products = await tx.product.findMany({ where: { tenantId, id: { in: productIds }, status: "ACTIVE" } });
         if (products.length !== productIds.length) throw new Error("PRODUCT_NOT_FOUND");
         const byId = new Map(products.map((product) => [product.id, product]));
-        const prepared = data.items.map((item: {productId: string; quantity: number}) => {
+        const prepared: Array<{ product: (typeof products)[number]; quantity: number; total: number }> = purchaseItems.map((item) => {
           const product = byId.get(item.productId)!;
           return { product, quantity: item.quantity, total: round2(item.quantity * number(product.purchaseCost)) };
         });
