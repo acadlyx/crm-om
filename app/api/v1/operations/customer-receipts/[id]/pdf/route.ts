@@ -162,7 +162,6 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 
   let page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
   let y = PAGE_HEIGHT - 46;
-  let isFirstPage = true;
 
   function nextPage() {
     page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
