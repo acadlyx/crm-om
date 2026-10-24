@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import QRCode from "qrcode";
+import { buildUpiUri, findStatementColumn, invoiceOutstandingBalance, parseStatementCsv, safeUpiFilename } from "@/lib/operations/upi-utils";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   AlertCircle, ArrowDownToLine, ArrowRight, CheckCircle2, Clipboard, LoaderCircle,
@@ -32,69 +33,12 @@ type Collection = {
 type ActiveQr = { id: string; uri: string; image: string; amount: number; reference: string };
 type IdempotencyAttempt = { signature: string; key: string };
 
-function invoiceBalance(item: RecordRow): number {
-  const payments = Array.isArray(item.payments) ? item.payments as Array<Record<string, unknown>> : [];
-  const allocations = Array.isArray(item.receiptAllocations) ? item.receiptAllocations as Array<Record<string, unknown>> : [];
-  const paidFromPayments = payments.filter((payment) => payment.status === "POSTED")
-    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-  const paidFromAllocations = allocations.filter((allocation) => {
-    const receipt = allocation.receipt && typeof allocation.receipt === "object" ? allocation.receipt as Record<string, unknown> : {};
-    return receipt.status === "POSTED";
-  }).reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0);
-  return Math.max(0, Number(item.total || 0) - paidFromPayments - paidFromAllocations);
-}
-
 const INR = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dateTime = (value: string | null | undefined) => {
   if (!value) return "—";
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(date) : "—";
 };
-const safeFilename = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 60) || "upi-qr";
-
-function buildUpiUri(input: { upiId: string; businessName: string; amount: number; transactionRef: string; payerName?: string | null; invoiceNumber?: string | null }) {
-  const params = new URLSearchParams();
-  params.set("pa", input.upiId);
-  params.set("pn", input.businessName.slice(0, 60));
-  params.set("am", input.amount.toFixed(2));
-  params.set("cu", "INR");
-  params.set("tr", input.transactionRef);
-  params.set("tn", (input.invoiceNumber ? "Invoice " + input.invoiceNumber : "Business payment") + " " + input.transactionRef);
-  return "upi://pay?" + params.toString();
-}
-
-function parseCsv(source: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = "";
-  let quoted = false;
-  for (let i = 0; i < source.length; i++) {
-    const ch = source[i];
-    if (ch === '"') {
-      if (quoted && source[i + 1] === '"') { cell += '"'; i++; }
-      else quoted = !quoted;
-    } else if (ch === "," && !quoted) {
-      row.push(cell.trim()); cell = "";
-    } else if ((ch === "\n" || ch === "\r") && !quoted) {
-      if (ch === "\r" && source[i + 1] === "\n") i++;
-      row.push(cell.trim()); cell = "";
-      if (row.some((value) => value !== "")) rows.push(row);
-      row = [];
-    } else {
-      cell += ch;
-    }
-  }
-  if (cell || row.length) {
-    row.push(cell.trim());
-    if (row.some((value) => value !== "")) rows.push(row);
-  }
-  return rows;
-}
-function normalizeHeader(value: string) { return value.toLowerCase().replace(/[^a-z0-9]/g, ""); }
-function firstIndex(headers: string[], names: string[]) {
-  return headers.findIndex((header) => names.includes(normalizeHeader(header)));
-}
-
 export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolean }) {
   const [rows, setRows] = useState<Collection[]>([]);
   const [customers, setCustomers] = useState<RecordRow[]>([]);
@@ -147,7 +91,7 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
   useEffect(() => { void load(); }, [load]);
 
   const invoiceOptions = useMemo(() => invoices
-    .map((item) => ({ item, balance: invoiceBalance(item) }))
+    .map((item) => ({ item, balance: invoiceOutstandingBalance(item) }))
     .filter(({ item, balance }) => !["DRAFT", "CANCELLED"].includes(String(item.status || "")) && balance > 0.005), [invoices]);
 
   const filtered = useMemo(() => {
@@ -290,13 +234,13 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
     setNotice("");
     try {
       if (file.size > 2_000_000) throw new Error("Statement file must be under 2 MB.");
-      const matrix = parseCsv(await file.text());
+      const matrix = parseStatementCsv(await file.text());
       if (matrix.length < 2) throw new Error("The CSV must have a header row and at least one transaction row.");
       const headers = matrix[0];
-      const refIndex = firstIndex(headers, ["transactionref", "transactionreference", "merchantreference", "reference", "referenceid", "referenceno", "remarks", "description", "details", "purpose", "comments", "orderid", "tr", "txnid"]);
-      const utrIndex = firstIndex(headers, ["utr", "utrno", "utrnumber", "bankreference", "bankref", "bankutr", "rrn", "transactionid", "upirefno", "upireference", "txnref", "refno"]);
-      const amountIndex = firstIndex(headers, ["amount", "credit", "creditedamount", "transactionamount"]);
-      const dateIndex = firstIndex(headers, ["paidat", "date", "datetime", "transactiondate", "valuedate"]);
+      const refIndex = findStatementColumn(headers, ["transactionref", "transactionreference", "merchantreference", "reference", "referenceid", "referenceno", "remarks", "description", "details", "purpose", "comments", "orderid", "tr", "txnid"]);
+      const utrIndex = findStatementColumn(headers, ["utr", "utrno", "utrnumber", "bankreference", "bankref", "bankutr", "rrn", "transactionid", "upirefno", "upireference", "txnref", "refno"]);
+      const amountIndex = findStatementColumn(headers, ["amount", "credit", "creditedamount", "transactionamount"]);
+      const dateIndex = findStatementColumn(headers, ["paidat", "date", "datetime", "transactiondate", "valuedate"]);
       if (refIndex < 0 || utrIndex < 0 || amountIndex < 0) {
         throw new Error("CSV needs transactionRef/reference, UTR/bankRef, and amount columns. Optional date columns are supported.");
       }
@@ -390,7 +334,7 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
             <strong style={{ fontSize: 22 }}>{INR.format(activeQr.amount)}</strong>
             <span className="muted" style={{ fontSize: 12, overflowWrap: "anywhere" }}>Reference: {activeQr.reference}</span>
             <div className="crm-form-actions" style={{ justifyContent: "center" }}>
-              <a className="brand-button" href={activeQr.image} download={"upi-qr-" + safeFilename(activeQr.reference) + ".png"}><ArrowDownToLine size={15} />Download QR</a>
+              <a className="brand-button" href={activeQr.image} download={"upi-qr-" + safeUpiFilename(activeQr.reference) + ".png"}><ArrowDownToLine size={15} />Download QR</a>
               <a className="crm-secondary-button" href={activeQr.uri}><ArrowRight size={15} />Open UPI app</a>
               <button type="button" className="crm-secondary-button" onClick={() => void copyPaymentLink()}><Clipboard size={14} />Copy link</button>
             </div>
