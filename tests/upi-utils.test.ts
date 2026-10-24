@@ -80,7 +80,7 @@ describe("invoiceOutstandingBalance", () => {
 
 describe("safeUpiFilename", () => {
   it("removes path separators and unsafe characters", () => {
-    expect(safeUpiFilename("../INV/2026 01")).toBe("..-INV-2026-01");
+    expect(safeUpiFilename("../INV/2026 01")).toBe("INV-2026-01");
     expect(safeUpiFilename("***")).toBe("upi-qr");
   });
 });
