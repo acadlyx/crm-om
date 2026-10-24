@@ -408,11 +408,11 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
         await tx.customerReceipt.update({ where: { id }, data: { status: "REVERSED", notes: [receipt.notes, "Reversal: " + parsed.data.reason].filter(Boolean).join("\n") } });
         for (const allocation of receipt.allocations) {
           const invoice = await tx.invoice.findFirst({ where: { id: allocation.invoiceId, tenantId }, include: {
-            payments: { select: { amount: true } },
+            payments: { select: { amount: true, status: true } },
             receiptAllocations: { include: { receipt: { select: { status: true } } } },
           } });
           if (!invoice) continue;
-          const legacyPaid = invoice.payments.reduce((sum, payment) => sum + n(payment.amount), 0);
+          const legacyPaid = invoice.payments.filter((payment) => payment.status === "POSTED").reduce((sum, payment) => sum + n(payment.amount), 0);
           const receiptsPaid = invoice.receiptAllocations.filter((entry) => entry.receipt.status === "POSTED").reduce((sum, entry) => sum + n(entry.amount), 0);
           const paid = legacyPaid + receiptsPaid;
           const status = paid + 0.005 >= n(invoice.total) ? "PAID" : paid > 0 ? "PARTIALLY_PAID" : invoice.status === "DRAFT" ? "DRAFT" : invoice.dueDate < new Date() ? "OVERDUE" : "SENT";
