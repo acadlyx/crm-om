@@ -101,7 +101,7 @@ async function getRows(resource: string, tenantId: string) {
     case "invoices":
       return db.invoice.findMany({
         where: { tenantId }, orderBy: { createdAt: "desc" }, take: 100,
-        include: { customer: { select: { id: true, name: true, company: true } }, payments: { select: { amount: true } } },
+        include: { customer: { select: { id: true, name: true, company: true } }, payments: { select: { amount: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } },
       });
     case "payments":
       return db.payment.findMany({
@@ -209,10 +209,12 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         created = await db.$transaction(async (tx) => {
           const invoice = await tx.invoice.findFirst({
             where: { id: data.invoiceId, tenantId, status: { not: "CANCELLED" } },
-            include: { payments: { select: { amount: true } } },
+            include: { payments: { select: { amount: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } },
           });
           if (!invoice) throw new Error("INVOICE_NOT_FOUND");
-          const received = invoice.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+          const legacyReceived = invoice.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+          const allocatedReceived = invoice.receiptAllocations.filter((allocation) => allocation.receipt.status === "POSTED").reduce((sum, allocation) => sum + Number(allocation.amount), 0);
+          const received = legacyReceived + allocatedReceived;
           const balance = Math.max(0, Number(invoice.total) - received);
           const amount = Number(data.amount);
           if (amount > balance + 0.005) throw new Error("PAYMENT_EXCEEDS_BALANCE");
