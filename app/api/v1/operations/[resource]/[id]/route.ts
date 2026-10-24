@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { requireWorkspaceAccess, writeAuditEvent } from "@/lib/crm/access";
 import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { customerCreditExposure } from "@/lib/operations/credit";
+import { invoiceStatusFromBalance } from "@/lib/operations/finance";
 
 function fail(message: string, status = 400) { return Response.json({ error: { message } }, { status }); }
 function n(value: unknown) { return Number(value ?? 0); }
@@ -443,7 +444,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
           const legacyPaid = invoice.payments.filter((payment) => payment.status === "POSTED").reduce((sum, payment) => sum + n(payment.amount), 0);
           const receiptsPaid = invoice.receiptAllocations.filter((entry) => entry.receipt.status === "POSTED").reduce((sum, entry) => sum + n(entry.amount), 0);
           const paid = legacyPaid + receiptsPaid;
-          const status = paid + 0.005 >= n(invoice.total) ? "PAID" : paid > 0 ? "PARTIALLY_PAID" : invoice.status === "DRAFT" ? "DRAFT" : invoice.dueDate < new Date() ? "OVERDUE" : "SENT";
+          const status = invoiceStatusFromBalance({ total: invoice.total, paid, dueDate: invoice.dueDate, wasDraft: invoice.status === "DRAFT" });
           await tx.invoice.update({ where: { id: invoice.id }, data: { status } });
         }
         await tx.ledgerEntry.create({ data: {
