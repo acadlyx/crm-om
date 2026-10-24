@@ -237,7 +237,7 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
       const matrix = parseStatementCsv(await file.text());
       if (matrix.length < 2) throw new Error("The CSV must have a header row and at least one transaction row.");
       const headers = matrix[0];
-      const refIndex = findStatementColumn(headers, ["transactionref", "transactionreference", "merchantreference", "reference", "referenceid", "referenceno", "remarks", "description", "details", "purpose", "comments", "orderid", "tr", "txnid"]);
+      const refIndex = findStatementColumn(headers, ["transactionref", "transactionreference", "transactionremarks", "merchantreference", "reference", "referenceid", "referenceno", "remarks", "description", "details", "purpose", "comments", "orderid", "tr", "txnid"]);
       const utrIndex = findStatementColumn(headers, ["utr", "utrno", "utrnumber", "bankreference", "bankref", "bankutr", "rrn", "transactionid", "upirefno", "upireference", "txnref", "refno"]);
       const amountIndex = findStatementColumn(headers, ["amount", "credit", "creditedamount", "transactionamount"]);
       const dateIndex = findStatementColumn(headers, ["paidat", "date", "datetime", "transactiondate", "valuedate"]);
