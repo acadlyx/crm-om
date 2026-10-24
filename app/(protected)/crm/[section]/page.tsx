@@ -187,7 +187,7 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
     case "invoices": {
       title = "Invoices"; resource = "invoices"; recordLabel = "invoice";
       description = "Create customer invoices, set due dates and see exactly what is still owed.";
-      const records = await db.invoice.findMany({ where: { tenantId }, include: { customer: { select: { name: true, company: true } }, payments: { select: { amount: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } }, orderBy: { createdAt: "desc" }, take: 300 });
+      const records = await db.invoice.findMany({ where: { tenantId }, include: { customer: { select: { name: true, company: true } }, payments: { select: { amount: true, status: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } }, orderBy: { createdAt: "desc" }, take: 300 });
       rows = records.map((item) => {
         const paidAmount = item.payments.filter((p) => p.status === "POSTED").reduce((sum, p) => sum + Number(p.amount), 0) + item.receiptAllocations.filter((allocation) => allocation.receipt.status === "POSTED").reduce((sum, allocation) => sum + Number(allocation.amount), 0);
         const balance = Math.max(0, Number(item.total) - paidAmount);
@@ -211,7 +211,7 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       description = "Log cash, UPI, card, cheque or bank-transfer receipts against invoices. Balances and invoice status update automatically.";
       const [records, invoicesForPayment] = await Promise.all([
         db.payment.findMany({ where: { tenantId }, include: { invoice: { select: { invoiceNumber: true, customer: { select: { name: true } } } } }, orderBy: { paidAt: "desc" }, take: 300 }),
-        db.invoice.findMany({ where: { tenantId, status: { not: "CANCELLED" } }, include: { customer: { select: { name: true } }, payments: { select: { amount: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } }, orderBy: { dueDate: "asc" }, take: 300 }),
+        db.invoice.findMany({ where: { tenantId, status: { not: "CANCELLED" } }, include: { customer: { select: { name: true } }, payments: { select: { amount: true, status: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } }, orderBy: { dueDate: "asc" }, take: 300 }),
       ]);
       rows = records.map((item) => ({ id: item.id, invoiceNumber: item.invoice.invoiceNumber, customerName: item.invoice.customer.name, amount: Number(item.amount), method: item.method, reference: item.reference, paidAt: item.paidAt.toISOString() }));
       const invoiceOptions = invoicesForPayment.map((item) => {
