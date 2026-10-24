@@ -15,6 +15,7 @@ const roleDefaults: Record<string, Record<string, string[]>> = {
     leads: ["read", "create", "update"],
     deals: ["read", "create", "update"],
     "sales-orders": ["read", "create", "update"],
+    products: ["read"],
     invoices: ["read"],
     tasks: ["read", "create", "update"],
     "customer-follow-ups": ["read", "create", "update"],
