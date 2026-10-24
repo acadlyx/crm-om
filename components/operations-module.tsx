@@ -555,7 +555,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
           : filtered.length === 0 ? <div className="dashboard-empty"><span className="dashboard-empty-icon"><Search size={18} /></span><strong>{search || statusFilter !== "ALL" ? "No records match your filters" : "Nothing has been recorded yet"}</strong><p>{error || (search || statusFilter !== "ALL" ? "Change the search or status filter and try again." : config.empty)}</p></div>
           : <>
             <div className="workspace-table-wrap"><table className="workspace-table operations-table"><thead><tr>{config.columns.map((column) => <th key={column.key}>{column.label}</th>)}<th>Actions</th></tr></thead>
-              <tbody>{filtered.slice(0, visibleCount).map((row) => <tr key={row.id}>{config.columns.map((column) => <td key={column.key}><Cell row={row} column={column} /></td>)}<td><RowActions resource={resource} row={row} owner={owner} onChange={changeStatus} onUpdate={updateRow} onInvoice={issueInvoice} /></td></tr>)}</tbody>
+              <tbody>{filtered.slice(0, visibleCount).map((row) => <tr key={row.id}>{config.columns.map((column) => <td key={column.key}><Cell row={row} column={column} /></td>)}<td><RowActions resource={resource} row={row} owner={owner} onChange={changeStatus} onUpdate={updateRow} onInvoice={issueInvoice} onEdit={startEditOrder} /></td></tr>)}</tbody>
             </table></div>
             <div className="operations-table-footer"><span>Showing {Math.min(visibleCount, filtered.length)} of {filtered.length} matching records</span>
               {filtered.length > visibleCount && <button className="crm-secondary-button" type="button" onClick={() => setVisibleCount((count) => Math.min(filtered.length, count + 20))}>Show more ({filtered.length - visibleCount} remaining) <ArrowRight size={14} /></button>}
@@ -649,11 +649,14 @@ function Cell({ row, column }: { row: Row; column: Column }) {
   return <span>{showValue(value, column.key)}</span>;
 }
 
-function RowActions({ resource, row, owner, onChange, onUpdate }: {
+function RowActions({ resource, row, owner, onChange, onUpdate, onInvoice, onEdit }: {
   resource: string; row: Row; owner: boolean; onChange: (row: Row, status: string) => void;
   onUpdate: (row: Row, body: Record<string, unknown>, confirmation?: string) => void;
+  onInvoice: (row: Row) => void;
+  onEdit: (row: Row) => void;
 }) {
   if (resource === "sales-orders") return <div className="operations-row-actions">
+    {owner && row.status === "DRAFT" && <button type="button" className="crm-secondary-button" onClick={()=>onEdit(row)}>Edit draft</button>}
     {row.status === "DRAFT" && <button type="button" className="crm-secondary-button" onClick={()=>onChange(row,"CONFIRMED")}>Confirm</button>}
     {owner && ["CONFIRMED","PARTIALLY_DELIVERED","DELIVERED"].includes(row.status) && !(row.invoices || []).length && <button type="button" className="crm-secondary-button" onClick={()=>onInvoice(row)}>Issue invoice</button>}
     {["DRAFT","CONFIRMED","PARTIALLY_DELIVERED"].includes(row.status) && <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"CANCELLED")}>Cancel</button>}
