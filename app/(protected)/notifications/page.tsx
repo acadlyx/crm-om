@@ -25,6 +25,7 @@ export default async function NotificationsPage() {
   return <>
     <p className="muted" style={{marginTop:0}}>Your workspace</p>
     <h1 style={{fontSize:30,marginTop:4}}>Notifications</h1>
+    <p className="muted">System notices use the current platform branding and are visible only to their recipient.</p>
     <NotificationsList brandName={brand.productName} initialItems={items.map(item => ({...item, createdAt:item.createdAt.toISOString(), readAt:item.readAt?.toISOString() ?? null}))} initialUnreadCount={unreadCount}/>
   </>;
 }
