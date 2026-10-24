@@ -28,7 +28,7 @@ Operations APIs are under `/api/v1/operations`. Existing CRM APIs remain under `
 ## Financial and stock rules
 
 - Sales orders calculate totals on the server from the current saved product selling price, quantity, discount and tax percentages. A draft can be edited only before it has deliveries or invoices.
-- A confirmed order is invoiced once. Issuing an invoice copies line-level values and creates a customer receivable ledger debit in one transaction.
+- A confirmed order is invoiced once. Issuing an invoice copies line-level values and creates a customer receivable ledger debit in one transaction. For credit terms (>0 days), a positive configured customer credit limit is enforced against current open receivables plus the new invoice; a zero limit is treated as “no cap configured,” not a zero-credit policy.
 - A posted legacy payment or customer receipt reduces the invoice balance only while it remains posted. Receipt allocations cannot exceed the invoice balance or actual receipt. A receipt allocated across invoices is recorded once as cash received; allocations separately reduce the relevant invoice balances.
 - Supplier bills create payable ledger credits. Supplier payments are recorded once and bill allocations reduce individual bill balances.
 - Posted financial records are reversed with a reason and audit event; the records themselves remain. Old payments now have an explicit `REVERSED` state.
