@@ -59,6 +59,75 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
       return Response.json({ data: { id, updated: true } });
     }
 
+    if (resource === "sales-orders" && body.action === "EDIT_DRAFT") {
+      const parsed = z.object({
+        customerId: z.string().uuid(),
+        orderDate: z.preprocess((value) => value === "" || value === null ? undefined : value, z.coerce.date().optional()),
+        expectedDeliveryAt: z.preprocess((value) => value === "" || value === null ? undefined : value, z.coerce.date().optional()),
+        notes: z.string().trim().max(4000).nullable().optional(),
+        items: z.array(z.object({
+          productId: z.string().uuid(),
+          quantity: z.coerce.number().finite().positive().max(1000000000),
+          discountPercent: z.coerce.number().min(0).max(100).optional().default(0),
+          taxPercent: z.coerce.number().min(0).max(100).optional().default(0),
+        }).strict()).min(1).max(100),
+      }).strict().safeParse(body);
+      if (!parsed.success) return fail(parsed.error.issues[0]?.message || "Check the revised order details.");
+      const result = await db.$transaction(async (tx) => {
+        const order = await tx.salesOrder.findFirst({
+          where: { id, tenantId },
+          include: { items: true, deliveries: true, invoices: true },
+        });
+        if (!order) return { kind: "NOT_FOUND" as const };
+        if (order.status !== "DRAFT" || order.deliveries.length || order.invoices.length) return { kind: "POSTED" as const };
+        const customer = await tx.customer.findFirst({ where: { id: parsed.data.customerId, tenantId, status: "ACTIVE" } });
+        if (!customer) return { kind: "CUSTOMER_NOT_FOUND" as const };
+        const productIds = [...new Set(parsed.data.items.map((item) => item.productId))];
+        const products = await tx.product.findMany({ where: { tenantId, id: { in: productIds }, status: "ACTIVE" } });
+        if (products.length !== productIds.length) return { kind: "PRODUCT_NOT_FOUND" as const };
+        const byId = new Map(products.map((product) => [product.id, product]));
+        const prepared = parsed.data.items.map((item) => {
+          const product = byId.get(item.productId)!;
+          const gross = Math.round((item.quantity * n(product.sellingPrice) + Number.EPSILON) * 100) / 100;
+          const discountAmount = Math.round((gross * item.discountPercent / 100 + Number.EPSILON) * 100) / 100;
+          const taxAmount = Math.round(((gross - discountAmount) * item.taxPercent / 100 + Number.EPSILON) * 100) / 100;
+          return { product, quantity: item.quantity, gross, discountAmount, taxAmount,
+            lineTotal: Math.round((gross - discountAmount + taxAmount + Number.EPSILON) * 100) / 100 };
+        });
+        const subtotal = Math.round((prepared.reduce((sum, item) => sum + item.gross, 0) + Number.EPSILON) * 100) / 100;
+        const discountAmount = Math.round((prepared.reduce((sum, item) => sum + item.discountAmount, 0) + Number.EPSILON) * 100) / 100;
+        const taxAmount = Math.round((prepared.reduce((sum, item) => sum + item.taxAmount, 0) + Number.EPSILON) * 100) / 100;
+        const total = Math.round((subtotal - discountAmount + taxAmount + Number.EPSILON) * 100) / 100;
+        await tx.salesOrderItem.deleteMany({ where: { orderId: order.id } });
+        await tx.salesOrderItem.createMany({
+          data: prepared.map((item) => ({
+            orderId: order.id, productId: item.product.id, description: item.product.name,
+            quantity: item.quantity, unitPrice: item.product.sellingPrice, unitCost: item.product.purchaseCost,
+            discountAmount: item.discountAmount, taxAmount: item.taxAmount, lineTotal: item.lineTotal,
+          })),
+        });
+        const updated = await tx.salesOrder.update({
+          where: { id: order.id },
+          data: {
+            customerId: customer.id,
+            ...(parsed.data.orderDate ? { orderDate: parsed.data.orderDate } : {}),
+            expectedDeliveryAt: parsed.data.expectedDeliveryAt ?? null,
+            notes: parsed.data.notes ?? null,
+            subtotal, discountAmount, taxAmount, total,
+          },
+        });
+        await audit(tx, actorId, "SALES_ORDER_DRAFT_EDITED", "SalesOrder", order.id, {
+          oldTotal: n(order.total), newTotal: total, lineCount: prepared.length,
+        });
+        return { kind: "UPDATED" as const, order: updated };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      if (result.kind === "NOT_FOUND") return fail("Sales order not found in this workspace.", 404);
+      if (result.kind === "POSTED") return fail("Only draft orders without deliveries or invoices can be edited.", 409);
+      if (result.kind === "CUSTOMER_NOT_FOUND") return fail("Customer not found or inactive in this workspace.", 400);
+      if (result.kind === "PRODUCT_NOT_FOUND") return fail("One or more products do not belong to this workspace or are inactive.", 400);
+      return Response.json({ data: result.order });
+    }
+
     if (resource === "sales-orders" && body.action === "ISSUE_INVOICE") {
       const invoicePermission = await requireWorkspacePermission(access, "invoices", "create");
       if (!invoicePermission.ok) return fail(invoicePermission.message, invoicePermission.status);
