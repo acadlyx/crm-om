@@ -369,13 +369,31 @@ export async function POST(request: Request, context: { params: Promise<{ resour
             purchaseOrderItemId: line.item.id, productId: line.item.productId, quantity: line.quantity, unitCost: line.unitCost,
           })) },
         }, include: { items: true } });
+        const businessSettings = await tx.businessSettings.findUnique({
+          where: { tenantId }, select: { inventoryCostingMethod: true },
+        });
         for (const line of receiptLines) {
           const update = await tx.purchaseOrderItem.updateMany({
             where: { id: line.item.id, receivedQuantity: { lte: number(line.item.quantity) - line.quantity } },
             data: { receivedQuantity: { increment: line.quantity } },
           });
           if (!update.count) throw new Error("RECEIPT_EXCEEDS_ORDERED");
-          await tx.product.update({ where: { id: line.item.productId }, data: { stockOnHand: { increment: line.quantity }, purchaseCost: line.unitCost } });
+          const product = await tx.product.findFirst({
+            where: { id: line.item.productId, tenantId },
+            select: { stockOnHand: true, purchaseCost: true },
+          });
+          if (!product) throw new Error("PRODUCT_NOT_FOUND");
+          const oldStock = number(product.stockOnHand);
+          const newStock = oldStock + line.quantity;
+          const weightedAverageCost = newStock > 0
+            ? round2((oldStock * number(product.purchaseCost) + line.quantity * line.unitCost) / newStock)
+            : line.unitCost;
+          const configuredMethod = businessSettings?.inventoryCostingMethod || "WEIGHTED_AVERAGE";
+          const newUnitCost = configuredMethod === "WEIGHTED_AVERAGE" ? weightedAverageCost : line.unitCost;
+          await tx.product.update({
+            where: { id: line.item.productId },
+            data: { stockOnHand: { increment: line.quantity }, purchaseCost: newUnitCost },
+          });
           await tx.inventoryMovement.create({ data: {
             tenantId, productId: line.item.productId, movementType: "PURCHASE_RECEIPT",
             quantity: line.quantity, unitCost: line.unitCost, referenceType: "GOODS_RECEIPT",
