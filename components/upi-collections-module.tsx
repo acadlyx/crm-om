@@ -49,7 +49,6 @@ const dateTime = (value: string | null | undefined) => {
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeStyle: "short" }).format(date) : "—";
 };
-const text = (value: unknown) => value == null || value === "" ? "—" : String(value);
 const safeFilename = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 60) || "upi-qr";
 
 function buildUpiUri(input: { upiId: string; businessName: string; amount: number; transactionRef: string; payerName?: string | null; invoiceNumber?: string | null }) {
@@ -142,6 +141,8 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
     }
   }, []);
 
+  // The loader updates state only after asynchronous network I/O; this effect wires initial loading.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(); }, [load]);
 
   const invoiceOptions = useMemo(() => invoices
