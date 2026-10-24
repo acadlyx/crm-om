@@ -321,6 +321,7 @@ model Invoice {
   issueDate     DateTime      @default(now()) @map("issue_date") @db.Date
   dueDate       DateTime      @map("due_date") @db.Date
   subtotal      Decimal       @db.Decimal(12, 2)
+  discountAmount Decimal      @default(0) @map("discount_amount") @db.Decimal(12, 2)
   taxAmount     Decimal       @default(0) @map("tax_amount") @db.Decimal(12, 2)
   total         Decimal       @db.Decimal(12, 2)
   status        InvoiceStatus @default(DRAFT)
@@ -334,6 +335,7 @@ model Invoice {
   updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@unique([tenantId, invoiceNumber])
+  @@unique([tenantId, salesOrderId])
   @@index([tenantId, status, dueDate])
   @@index([tenantId, customerId, issueDate])
   @@map("invoices")
