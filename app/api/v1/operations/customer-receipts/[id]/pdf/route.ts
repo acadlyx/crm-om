@@ -50,9 +50,9 @@ function fromHex(value: string): PDFColor {
 
 function tint(color: PDFColor, amount: number) {
   return rgb(
-    color.r + (1 - color.r) * amount,
-    color.g + (1 - color.g) * amount,
-    color.b + (1 - color.b) * amount,
+    color.red + (1 - color.red) * amount,
+    color.green + (1 - color.green) * amount,
+    color.blue + (1 - color.blue) * amount,
   );
 }
 
