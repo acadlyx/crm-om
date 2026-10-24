@@ -298,6 +298,27 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
     }
   }
 
+  function startEditOrder(row: Row) {
+    setError("");
+    setNotice("");
+    setEditingOrder(row);
+    const nextLines = (row.items || []).map((item: Row) => {
+      const gross = Number(item.quantity || 0) * Number(item.unitPrice || 0);
+      const discountPercent = gross > 0 ? Number(item.discountAmount || 0) / gross * 100 : 0;
+      const taxable = gross - Number(item.discountAmount || 0);
+      const taxPercent = taxable > 0 ? Number(item.taxAmount || 0) / taxable * 100 : 0;
+      return {
+        productId: item.productId,
+        quantity: String(item.quantity),
+        discountPercent: discountPercent.toFixed(2),
+        taxPercent: taxPercent.toFixed(2),
+      };
+    });
+    setOrderLines(nextLines.length ? nextLines : [{ productId: "", quantity: "1", discountPercent: "0", taxPercent: "0" }]);
+    setFormOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   async function issueInvoice(row: Row) {
     if (!window.confirm("Issue a customer invoice from order " + row.orderNumber + "? This will create a financial record and prevent the order from being cancelled.")) return;
     setNotice("");
