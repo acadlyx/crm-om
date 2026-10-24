@@ -1,71 +1,38 @@
-.workspace-shell { min-height: 100vh; display: flex; width: 100%; }
+.shell.workspace-shell { min-height: 100vh; display: flex; width: 100%; }
 .workspace-shell .sidebar-slot { width: 250px; min-width: 0; flex: 0 0 250px; }
 .workspace-shell .mobile-shell-header { display: none; }
 .workspace-shell .mobile-nav-backdrop { display: none; }
 .workspace-shell .mobile-shell-toggle { display: none; }
+.workspace-shell .crm-module-heading .dashboard-subtitle,
+.workspace-shell .owner-header .dashboard-subtitle,
+.workspace-shell .team-admin-page .dashboard-subtitle { display: none; }
 
 @media (max-width: 760px) {
-  .workspace-shell { display: flex; flex-direction: column; width: 100%; min-width: 0; }
+  .shell.workspace-shell { display: flex; flex-direction: column; width: 100%; min-width: 0; }
   .workspace-shell .mobile-shell-header {
-    display: flex;
-    position: sticky;
-    top: 0;
-    z-index: 80;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    min-height: 66px;
-    padding: 9px 14px;
-    background: #fff;
-    border-bottom: 1px solid #e8ebf0;
+    display: flex; position: sticky; top: 0; z-index: 80;
+    align-items: center; justify-content: space-between; gap: 12px;
+    min-height: 66px; padding: 9px 14px; background: #fff; border-bottom: 1px solid #e8ebf0;
   }
   .workspace-shell .mobile-shell-brand { overflow: hidden; max-width: calc(100% - 54px); color: #25334a; font-size: 15px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
   .workspace-shell .mobile-shell-toggle {
-    display: grid;
-    flex: 0 0 42px;
-    width: 42px;
-    height: 42px;
-    place-items: center;
-    border: 1px solid #e1e6ee;
-    border-radius: 11px;
-    background: #fff;
-    color: #263750;
-    cursor: pointer;
+    display: grid; flex: 0 0 42px; width: 42px; height: 42px; place-items: center;
+    border: 1px solid #e1e6ee; border-radius: 11px; background: #fff; color: #263750; cursor: pointer;
   }
   .workspace-shell .mobile-shell-toggle:focus-visible { outline: 3px solid #b8cbff; outline-offset: 2px; }
   .workspace-shell .mobile-nav-backdrop {
-    display: block;
-    position: fixed;
-    inset: 66px 0 0;
-    z-index: 70;
-    width: 100%;
-    height: calc(100dvh - 66px);
-    padding: 0;
-    border: 0;
-    background: rgb(15 23 42 / 42%);
+    display: block; position: fixed; inset: 66px 0 0; z-index: 70; width: 100%; height: calc(100dvh - 66px);
+    padding: 0; border: 0; background: rgb(15 23 42 / 42%);
   }
   .workspace-shell .sidebar-slot { position: static; width: 0; height: 0; min-width: 0; flex: 0 0 0; }
   .workspace-shell .sidebar-slot .sidebar {
-    position: fixed !important;
-    z-index: 71;
-    top: 66px;
-    bottom: 0;
-    left: 0;
-    width: min(84vw, 310px);
-    max-width: calc(100vw - 38px);
-    height: auto;
-    max-height: none;
+    position: fixed !important; z-index: 71; top: 66px; bottom: 0; left: 0;
+    width: min(84vw, 310px); max-width: calc(100vw - 38px); height: auto; max-height: none;
     padding: 18px 12px max(20px, env(safe-area-inset-bottom));
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    border-right: 1px solid #e8ebf0;
-    border-bottom: 0;
-    background: #fff;
+    overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+    border-right: 1px solid #e8ebf0; border-bottom: 0; background: #fff;
     box-shadow: 0 15px 45px rgb(21 34 56 / 14%);
-    transform: translateX(-105%);
-    visibility: hidden;
-    transition: transform .2s ease, visibility .2s ease;
+    transform: translateX(-105%); visibility: hidden; transition: transform .2s ease, visibility .2s ease;
   }
   .workspace-shell.mobile-nav-open .sidebar-slot .sidebar { transform: translateX(0); visibility: visible; }
   .workspace-shell .sidebar-nav { margin-top: 0; }
