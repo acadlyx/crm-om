@@ -15,6 +15,11 @@ export default async function BusinessSettingsPage() {
     contactPhone:settings.contactPhone,address:settings.address,invoicePrefix:settings.invoicePrefix,
     invoiceIdentity:(settings.invoiceIdentity??{}) as Record<string,unknown>,
     preferences:(settings.preferences??{}) as Record<string,unknown>,
+    currency: settings.currency,
+    timezone: settings.timezone,
+    financialYearStartMonth: settings.financialYearStartMonth,
+    inventoryCostingMethod: settings.inventoryCostingMethod as "WEIGHTED_AVERAGE",
+    defaultPaymentTermsDays: settings.defaultPaymentTermsDays,
   }:null;
   return <><p className="muted">Tenant settings</p><h1 style={{fontSize:30,marginTop:4}}>Business identity</h1><p className="muted">Manage your business name, logo, contact details and invoice settings. These never change the global product brand.</p><section className="card"><TenantSettingsForm initial={initial}/></section></>;
 }
