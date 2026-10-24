@@ -35,7 +35,7 @@ function formatMoney(value: unknown) {
 
 function display(value: unknown, key: string) {
   if (value === null || value === undefined || value === "") return "—";
-  if (["amount", "total", "subtotal", "taxAmount", "paidAmount", "balance", "estimatedValue", "value"].includes(key)) return formatMoney(value);
+  if (["amount", "total", "subtotal", "taxAmount", "paidAmount", "balance", "estimatedValue", "value", "creditLimit"].includes(key)) return formatMoney(value);
   if (key.toLowerCase().includes("date") || key === "createdAt" || key === "paidAt" || key === "spentAt") {
     const date = new Date(String(value));
     if (Number.isFinite(date.getTime())) {
