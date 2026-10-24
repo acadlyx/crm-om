@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   Activity, AlertCircle, ArrowDownRight, ArrowRight, ArrowUpRight, Boxes,
   CalendarClock, CheckCircle2, ClipboardList, CreditCard, FileText, HandCoins,
@@ -62,10 +63,10 @@ function invoicePaid(invoice: {
 function currencyPercent(value: number) {
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(value) + "%";
 }
-function ShowMoreList({ items, empty, renderItem }: {
-  items: Array<{ id: string }>;
+function ShowMoreList<T extends { id: string }>({ items, empty, renderItem }: {
+  items: T[];
   empty: string;
-  renderItem: (item: any) => React.ReactNode;
+  renderItem: (item: T) => ReactNode;
 }) {
   if (!items.length) return <div className="owner-empty"><CheckCircle2 size={17} /><span>{empty}</span></div>;
   return (
@@ -220,7 +221,7 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
   const delayedPOs = purchaseOrders.filter((item) => item.expectedAt && new Date(item.expectedAt) < today);
   const pendingReceiptCount = purchaseOrders.filter((po) => po.status === "PARTIALLY_RECEIVED").length;
   const activeInvoiceIds = new Set(allInvoices.map((invoice) => invoice.id));
-  const actionCount = overdue.length + dueSoonInvoices.length + followUps.length + overdueDeliveries.length + lowStock.length + delayedPOs.length + movements.length;
+  const actionCount = overdue.length + dueSoonInvoices.length + followUps.length + tasks.length + overdueDeliveries.length + lowStock.length + delayedPOs.length + movements.length;
   const topProducts = new Map<string, { id: string; sku: string; name: string; value: number; quantity: number }>();
   const topCustomers = new Map<string, { id: string; name: string; value: number; orders: number }>();
   for (const order of salesOrders) {
@@ -253,6 +254,7 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
   const kpis = [
     { label: "Sales booked", value: money(bookedSales, currency), note: "Orders and standalone invoices issued in period", icon: ShoppingCart, href: actionUrl("/operations/sales-orders"), tone: "blue" },
     { label: "Collections received", value: money(collections, currency), note: "Posted customer payments in period", icon: HandCoins, href: actionUrl("/operations/customer-receipts"), tone: "green" },
+    { label: "Supplier payments sent", value: money(periodSupplierPayments.reduce((sum, payment) => sum + number(payment.amount), 0), currency), note: "Posted supplier payments in period", icon: Wallet, href: actionUrl("/operations/supplier-payments"), tone: "amber" },
     { label: "Customer receivables", value: money(receivablesTotal, currency), note: "Cumulative unpaid invoice balances", icon: CreditCard, href: "/crm/invoices", tone: "violet" },
     { label: "Overdue receivables", value: money(overdueTotal, currency), note: overdue.length + " overdue invoices", icon: AlertCircle, href: "/crm/invoices", tone: "amber" },
     { label: "Supplier payables", value: money(payableTotal, currency), note: "Unpaid supplier bills after posted allocations", icon: Wallet, href: "/operations/supplier-bills", tone: "amber" },
@@ -342,6 +344,12 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
             </section>
             <section><div className="owner-action-heading"><Users size={15} /><strong>Collection follow-ups</strong><span>{followUps.length}</span></div>
               <ShowMoreList items={followUps} empty="No open customer follow-ups due soon." renderItem={(item) => <Link className="owner-action-row" href="/operations/customer-follow-ups"><span><strong>{item.title}</strong><small>{item.customer.name} · Due {dateLabel(item.dueAt)}</small></span><ArrowRight size={15} /></Link>} />
+            </section>
+            <section><div className="owner-action-heading"><ClipboardList size={15} /><strong>Open tasks</strong><span>{tasks.length}</span></div>
+              <ShowMoreList items={tasks} empty="No open tasks are due soon." renderItem={(item) => <Link className="owner-action-row" href="/crm/tasks"><span><strong>{item.title}</strong><small>{item.status.replaceAll("_", " ")} · {item.dueDate ? "Due " + dateLabel(item.dueDate) : "No due date"} · {item.priority}</small></span><ArrowRight size={15} /></Link>} />
+            </section>
+            <section><div className="owner-action-heading"><ShoppingCart size={15} /><strong>Open orders not fully delivered</strong><span>{openOrders.length}</span></div>
+              <ShowMoreList items={openOrders} empty="No confirmed sales orders are awaiting delivery." renderItem={(item) => <Link className="owner-action-row" href="/operations/sales-orders"><span><strong>{item.orderNumber} · {item.customer.name}</strong><small>{item.status.replaceAll("_", " ")} · {dateLabel(item.orderDate)}</small></span><b>{money(number(item.total), currency)}</b></Link>} />
             </section>
             <section><div className="owner-action-heading"><Truck size={15} /><strong>Delayed deliveries</strong><span>{overdueDeliveries.length}</span></div>
               <ShowMoreList items={overdueDeliveries} empty="No delayed deliveries." renderItem={(item) => <Link className="owner-action-row" href="/operations/deliveries"><span><strong>{item.deliveryNumber} · {item.order.customer.name}</strong><small>{item.status} · Scheduled {item.scheduledAt ? dateLabel(item.scheduledAt) : "not set"}</small></span><ArrowRight size={15} /></Link>} />
