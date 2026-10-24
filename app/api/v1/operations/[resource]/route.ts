@@ -457,10 +457,10 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         for (const allocation of data.allocations) {
           const invoice = await tx.invoice.findFirst({
             where: { id: allocation.invoiceId, tenantId, customerId: customer.id, status: { not: "CANCELLED" } },
-            include: { payments: { select: { amount: true } }, receiptAllocations: { include: { receipt: { select: { amount: true, status: true } } } } },
+            include: { payments: { select: { amount: true, status: true } }, receiptAllocations: { include: { receipt: { select: { amount: true, status: true } } } } },
           });
           if (!invoice) throw new Error("INVOICE_NOT_FOUND");
-          const legacyPaid = invoice.payments.reduce((sum, payment) => sum + number(payment.amount), 0);
+          const legacyPaid = invoice.payments.filter((payment) => payment.status === "POSTED").reduce((sum, payment) => sum + number(payment.amount), 0);
           const receiptsPaid = invoice.receiptAllocations.filter((entry) => entry.receipt.status === "POSTED").reduce((sum, entry) => sum + number(entry.amount), 0);
           const balance = Math.max(0, number(invoice.total) - legacyPaid - receiptsPaid);
           if (allocation.amount > balance + 0.005) throw new Error("ALLOCATION_EXCEEDS_BALANCE");
@@ -474,10 +474,10 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         for (const allocation of data.allocations) {
           const invoice = await tx.invoice.findFirst({
             where: { id: allocation.invoiceId, tenantId, customerId: customer.id, status: { not: "CANCELLED" } },
-            include: { payments: { select: { amount: true } }, receiptAllocations: { include: { receipt: { select: { status: true } } } } },
+            include: { payments: { select: { amount: true, status: true } }, receiptAllocations: { include: { receipt: { select: { status: true } } } } },
           });
           if (!invoice) throw new Error("INVOICE_NOT_FOUND");
-          const legacyPaid = invoice.payments.reduce((sum, payment) => sum + number(payment.amount), 0);
+          const legacyPaid = invoice.payments.filter((payment) => payment.status === "POSTED").reduce((sum, payment) => sum + number(payment.amount), 0);
           const receiptsPaid = invoice.receiptAllocations.filter((entry) => entry.receipt.status === "POSTED").reduce((sum, entry) => sum + number(entry.amount), 0);
           const paidAfter = legacyPaid + receiptsPaid;
           await tx.invoice.update({ where: { id: invoice.id }, data: { status: paidAfter + 0.005 >= number(invoice.total) ? "PAID" : "PARTIALLY_PAID" } });
