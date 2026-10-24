@@ -51,7 +51,7 @@ function display(value: unknown, key: string) {
 }
 
 export function CrmModule({
-  resource, title, description, fields, columns, initialRows, workflow, recordLabel, owner = false,
+  resource, title, description, fields, columns, initialRows, workflow, recordLabel, owner = false, canUpdate = false,
 }: {
   resource: string;
   title: string;
@@ -62,6 +62,7 @@ export function CrmModule({
   workflow?: Workflow;
   recordLabel?: string;
   owner?: boolean;
+  canUpdate?: boolean;
 }) {
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
@@ -73,6 +74,7 @@ export function CrmModule({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [financialIdempotencyKey, setFinancialIdempotencyKey] = useState<{ signature: string; key: string } | null>(null);
+  const [editingCustomer, setEditingCustomer] = useState<CrmRow | null>(null);
 
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -113,6 +115,47 @@ export function CrmModule({
       router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not save this record.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveCustomerEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingCustomer) return;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    const raw = Object.fromEntries(new FormData(event.currentTarget).entries());
+    const payload: Record<string, unknown> = {
+      ...raw,
+      creditLimit: Number(raw.creditLimit || 0),
+      paymentTermsDays: Number(raw.paymentTermsDays || 0),
+    };
+    try {
+      const response = await fetch("/api/v1/crm/customers/" + encodeURIComponent(editingCustomer.id), {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error?.message || "Could not update customer details.");
+      setRows((current) => current.map((row) => row.id === editingCustomer.id ? {
+        ...row,
+        ...payload,
+        email: payload.email || null,
+        company: payload.company || null,
+        phone: payload.phone || null,
+        address: payload.address || "",
+        creditLimit: Number(payload.creditLimit || 0),
+        paymentTermsDays: Number(payload.paymentTermsDays || 0),
+      } : row));
+      setNotice("Customer profile updated.");
+      setEditingCustomer(null);
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not update customer details.");
     } finally {
       setBusy(false);
     }
@@ -233,6 +276,39 @@ export function CrmModule({
         </section>
       )}
 
+      {editingCustomer && resource === "customers" && canUpdate && (
+        <section className="card crm-form-card">
+          <div className="dashboard-panel-heading"><div><p className="dashboard-eyebrow">EDIT CUSTOMER</p><h2>{String(editingCustomer.name || "Customer profile")}</h2></div><button type="button" className="crm-secondary-button" onClick={() => setEditingCustomer(null)} disabled={busy}>Close</button></div>
+          <form className="crm-create-form" onSubmit={saveCustomerEdit}>
+            <div className="crm-form-grid">
+              {fields.map((field) => {
+                const fieldValue = editingCustomer[field.name];
+                const defaultValue = field.name === "address" ? String(fieldValue ?? "")
+                  : field.name === "creditLimit" || field.name === "paymentTermsDays" ? String(fieldValue ?? 0)
+                  : String(fieldValue ?? "");
+                return <label className={"field" + (field.type === "textarea" ? " crm-field-wide" : "")} key={field.name}>
+                  <span>{field.label}{field.required ? " *" : ""}</span>
+                  {field.type === "textarea"
+                    ? <textarea name={field.name} required={field.required} rows={3} defaultValue={defaultValue} placeholder={field.placeholder || ""} />
+                    : field.type === "select"
+                    ? <select name={field.name} required={field.required} defaultValue={defaultValue}>
+                        <option value="">{field.required ? "Choose an option" : "Not linked / not set"}</option>
+                        {(field.options || []).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                      </select>
+                    : <input name={field.name} type={field.type} required={field.required} defaultValue={defaultValue}
+                        placeholder={field.placeholder || ""} step={field.step} min={field.type === "number" ? "0" : undefined} />}
+                </label>;
+              })}
+            </div>
+            {error && <p className="workspace-form-message is-error" role="alert"><CircleAlert size={16} />{error}</p>}
+            <div className="crm-form-actions">
+              <button className="brand-button" type="submit" disabled={busy}>{busy ? <LoaderCircle size={16} className="workspace-spinner" /> : <CheckCircle2 size={16} />}{busy ? "Saving…" : "Save customer changes"}</button>
+              <button className="crm-secondary-button" type="button" onClick={() => setEditingCustomer(null)} disabled={busy}>Cancel</button>
+            </div>
+          </form>
+        </section>
+      )}
+
       {notice && <p className="crm-notice" role="status"><CheckCircle2 size={16} />{notice}</p>}
       {!open && error && <p className="workspace-form-message is-error" role="alert"><CircleAlert size={16} />{error}</p>}
 
@@ -246,7 +322,7 @@ export function CrmModule({
         </div>
         {filteredRows.length ? (
           <div className="crm-table-wrap"><table className="crm-table">
-            <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}{workflow && <th>{workflow.label}</th>}{resource === "payments" && owner && <th>Actions</th>}</tr></thead>
+            <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}{workflow && canUpdate && <th>{workflow.label}</th>}{((resource === "payments" && owner) || (resource === "customers" && canUpdate)) && <th>Actions</th>}</tr></thead>
             <tbody>{filteredRows.slice(0, visibleCount).map((row) => (
               <tr key={row.id}>
                 {columns.map((column, index) => {
@@ -254,9 +330,10 @@ export function CrmModule({
                   const statusish = ["status", "stage", "priority"].includes(column.key);
                   return <td key={column.key}>{index === 0 ? <strong className="crm-primary-cell">{display(value, column.key)}</strong> : statusish ? <span className={"crm-pill crm-pill-" + String(value || "").toLowerCase()}>{display(value, column.key)}</span> : display(value, column.key)}</td>;
                 })}
-                {workflow && <td><select className="crm-workflow-select" value={String(row[workflow.field] || "")} disabled={busyRow === row.id} onChange={(event) => updateWorkflow(row, event.target.value)} aria-label={workflow.label + " for " + String(row[columns[0]?.key] || "record")}>
+                {workflow && canUpdate && <td><select className="crm-workflow-select" value={String(row[workflow.field] || "")} disabled={busyRow === row.id} onChange={(event) => updateWorkflow(row, event.target.value)} aria-label={workflow.label + " for " + String(row[columns[0]?.key] || "record")}>
                   {workflow.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>{busyRow === row.id && <LoaderCircle size={13} className="workspace-spinner crm-inline-spinner" />}</td>}
+                {resource === "customers" && canUpdate && <td><button type="button" className="crm-secondary-button" onClick={() => { setError(""); setNotice(""); setEditingCustomer(row); }}>Edit profile</button></td>}
                 {resource === "payments" && owner && <td>{row.status === "POSTED"
                   ? <button type="button" className="crm-secondary-button is-danger" disabled={busyRow === row.id} onClick={() => void reversePayment(row)}>{busyRow === row.id ? <LoaderCircle size={13} className="workspace-spinner" /> : "Reverse payment"}</button>
                   : <span className="crm-pill crm-pill-overdue">Reversed</span>}</td>}
