@@ -213,7 +213,7 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
         db.payment.findMany({ where: { tenantId }, include: { invoice: { select: { invoiceNumber: true, customer: { select: { name: true } } } } }, orderBy: { paidAt: "desc" }, take: 300 }),
         db.invoice.findMany({ where: { tenantId, status: { not: "CANCELLED" } }, include: { customer: { select: { name: true } }, payments: { select: { amount: true, status: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } }, orderBy: { dueDate: "asc" }, take: 300 }),
       ]);
-      rows = records.map((item) => ({ id: item.id, invoiceNumber: item.invoice.invoiceNumber, customerName: item.invoice.customer.name, amount: Number(item.amount), method: item.method, reference: item.reference, paidAt: item.paidAt.toISOString() }));
+      rows = records.map((item) => ({ id: item.id, invoiceNumber: item.invoice.invoiceNumber, customerName: item.invoice.customer.name, amount: Number(item.amount), method: item.method, reference: item.reference, paidAt: item.paidAt.toISOString(), status: item.status }));
       const invoiceOptions = invoicesForPayment.map((item) => {
         const paid = item.payments.filter((payment) => payment.status === "POSTED").reduce((sum, payment) => sum + Number(payment.amount), 0) + item.receiptAllocations.filter((allocation) => allocation.receipt.status === "POSTED").reduce((sum, allocation) => sum + Number(allocation.amount), 0);
         return { item, balance: Math.max(0, Number(item.total) - paid) };
@@ -226,7 +226,7 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
         { name: "paidAt", label: "Payment date", type: "date" },
         { name: "notes", label: "Notes", type: "textarea", placeholder: "Optional receipt notes" },
       ];
-      columns = [{ key: "invoiceNumber", label: "Invoice" }, { key: "customerName", label: "Customer" }, { key: "amount", label: "Amount received" }, { key: "method", label: "Method" }, { key: "reference", label: "Reference" }, { key: "paidAt", label: "Received on" }];
+      columns = [{ key: "invoiceNumber", label: "Invoice" }, { key: "customerName", label: "Customer" }, { key: "amount", label: "Amount received" }, { key: "method", label: "Method" }, { key: "reference", label: "Reference" }, { key: "paidAt", label: "Received on" }, { key: "status", label: "Status" }];
       if (!invoiceOptions.length) description = "No unpaid invoices right now. Create an invoice first; the system will prevent payments greater than the amount still owed.";
       break;
     }
@@ -270,5 +270,5 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       notFound();
   }
 
-  return <CrmModule key={JSON.stringify(rows)} resource={resource} title={title} description={description} fields={fields} columns={columns} initialRows={rows} workflow={workflow} recordLabel={recordLabel} />;
+  return <CrmModule key={JSON.stringify(rows)} resource={resource} title={title} description={description} fields={fields} columns={columns} initialRows={rows} workflow={workflow} recordLabel={recordLabel} owner={access.user.role === "TENANT_ADMIN" || access.user.role === "PLATFORM_ADMIN"} />;
 }
