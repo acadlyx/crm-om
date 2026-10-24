@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 type TenantSettings = {
   businessName: string; logoUrl: string | null; contactEmail: string | null; contactPhone: string | null;
   address: string | null; invoicePrefix: string; invoiceIdentity: Record<string, unknown>; preferences: Record<string, unknown>;
+  currency: string; timezone: string; financialYearStartMonth: number; inventoryCostingMethod: "WEIGHTED_AVERAGE"; defaultPaymentTermsDays: number;
 };
-const blank: TenantSettings = {businessName:"",logoUrl:null,contactEmail:null,contactPhone:null,address:null,invoicePrefix:"INV",invoiceIdentity:{},preferences:{}};
+const blank: TenantSettings = {businessName:"",logoUrl:null,contactEmail:null,contactPhone:null,address:null,invoicePrefix:"INV",invoiceIdentity:{},preferences:{},currency:"INR",timezone:"Asia/Kolkata",financialYearStartMonth:4,inventoryCostingMethod:"WEIGHTED_AVERAGE",defaultPaymentTermsDays:0};
 
 export function TenantSettingsForm({ initial }: { initial: TenantSettings | null }) {
   const router=useRouter();
@@ -48,6 +49,25 @@ export function TenantSettingsForm({ initial }: { initial: TenantSettings | null
     <label className="field">Business contact email<input type="email" maxLength={320} value={form.contactEmail||""} onChange={e=>update("contactEmail",e.target.value||null)} /></label>
     <label className="field">Business phone<input type="tel" maxLength={40} value={form.contactPhone||""} onChange={e=>update("contactPhone",e.target.value||null)} /></label>
     <label className="field">Business address<textarea rows={3} maxLength={1000} value={form.address||""} onChange={e=>update("address",e.target.value||null)} /></label>
+    <h2 className="settings-section-heading">Operating preferences</h2>
+    <label className="field">Business currency
+      <select value={form.currency} onChange={e=>update("currency",e.target.value)}>
+        <option value="INR">INR · Indian Rupee</option><option value="USD">USD · US Dollar</option><option value="EUR">EUR · Euro</option><option value="GBP">GBP · Pound Sterling</option><option value="AED">AED · UAE Dirham</option><option value="CAD">CAD · Canadian Dollar</option><option value="AUD">AUD · Australian Dollar</option><option value="SGD">SGD · Singapore Dollar</option>
+      </select>
+    </label>
+    <label className="field">Business timezone<input required maxLength={80} value={form.timezone} onChange={e=>update("timezone",e.target.value)} placeholder="Asia/Kolkata" /><small className="muted">Use an IANA timezone such as Asia/Kolkata or Europe/London.</small></label>
+    <label className="field">Financial year starts in
+      <select value={String(form.financialYearStartMonth)} onChange={e=>update("financialYearStartMonth",Number(e.target.value))}>
+        {["January","February","March","April","May","June","July","August","September","October","November","December"].map((month,index)=><option key={month} value={index+1}>{month}</option>)}
+      </select>
+    </label>
+    <label className="field">Inventory costing method
+      <select value={form.inventoryCostingMethod} onChange={e=>update("inventoryCostingMethod",e.target.value as "WEIGHTED_AVERAGE")}>
+        <option value="WEIGHTED_AVERAGE">Moving weighted average</option>
+      </select>
+      <small className="muted">This workspace currently supports moving weighted-average costing.</small>
+    </label>
+    <label className="field">Default payment terms (days)<input type="number" required min={0} max={365} step={1} value={form.defaultPaymentTermsDays} onChange={e=>update("defaultPaymentTermsDays",Number(e.target.value))} /></label>
     <label className="field">Invoice prefix<input required pattern="[A-Za-z0-9_-]+" maxLength={20} value={form.invoicePrefix} onChange={e=>update("invoicePrefix",e.target.value)} /></label>
     {error&&<p role="alert" style={{color:"#b42318"}}>{error}</p>}{message&&<p role="status" style={{color:"#067647"}}>{message}</p>}
     <button className="brand-button" disabled={busy||uploading}>{busy?"Saving…":"Save business identity"}</button>
