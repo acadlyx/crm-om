@@ -3,6 +3,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { requireWorkspaceAccess } from "@/lib/crm/access";
 import { requireWorkspacePermission } from "@/lib/operations/permissions";
+import { customerCreditExposure } from "@/lib/operations/credit";
 
 const blank = (v: unknown) => v === "" || v === null ? undefined : v;
 const maybeText = z.preprocess(blank, z.string().trim().max(2000).optional());
@@ -293,7 +294,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
       const result = await db.$transaction(async (tx) => {
         const existing = await tx.salesOrder.findUnique({ where: { tenantId_idempotencyKey: { tenantId, idempotencyKey: data.idempotencyKey } } });
         if (existing) return { existing: true, order: existing };
-        const customer = await tx.customer.findFirst({ where: { id: data.customerId, tenantId, status: "ACTIVE" } });
+        const customer = await tx.customer.findFirst({ where: { id: data.customerId, tenantId, status: "ACTIVE" }, select: { id: true, creditLimit: true, paymentTermsDays: true } });
         if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
         const salesItems = data.items as Array<{ productId: string; quantity: number; discountPercent: number; taxPercent: number }>;
         const productIds: string[] = Array.from(new Set<string>(salesItems.map((item) => item.productId)));
@@ -311,6 +312,19 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         const discountAmount = round2(prepared.reduce((sum, item) => sum + item.discount, 0));
         const taxAmount = round2(prepared.reduce((sum, item) => sum + item.tax, 0));
         const total = round2(subtotal - discountAmount + taxAmount);
+        if (data.status === "CONFIRMED") {
+          const businessSettings = await tx.businessSettings.findUnique({
+            where: { tenantId }, select: { defaultPaymentTermsDays: true },
+          });
+          const termsDays = customer.paymentTermsDays > 0
+            ? customer.paymentTermsDays
+            : businessSettings?.defaultPaymentTermsDays ?? 0;
+          const limit = number(customer.creditLimit);
+          if (termsDays > 0 && limit > 0) {
+            const exposure = await customerCreditExposure(tx, tenantId, customer.id);
+            if (exposure + total > limit + 0.005) throw new Error("CREDIT_LIMIT_EXCEEDED");
+          }
+        }
         const order = await tx.salesOrder.create({ data: {
           tenantId, customerId: customer.id, orderNumber: nextNumber("SO"),
           status: data.status, orderDate: data.orderDate ?? new Date(), expectedDeliveryAt: data.expectedDeliveryAt ?? null,
@@ -645,6 +659,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
     const message = (error as Error)?.message || "";
     const statusMap: Record<string, [number, string]> = {
       CUSTOMER_NOT_FOUND: [404, "Customer not found in this workspace."],
+      CREDIT_LIMIT_EXCEEDED: [409, "Customer credit limit would be exceeded. Keep the order as a draft or review the customer credit terms before confirmation."],
       PRODUCT_NOT_FOUND: [400, "One or more products do not belong to this workspace or are inactive."],
       SUPPLIER_NOT_FOUND: [404, "Supplier not found in this workspace."],
       PURCHASE_ORDER_NOT_RECEIVABLE: [409, "This purchase order cannot receive additional stock."],
