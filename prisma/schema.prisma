@@ -328,6 +328,7 @@ model Invoice {
   status        InvoiceStatus @default(DRAFT)
   notes         String?       @db.Text
   salesOrderId  String?       @map("sales_order_id") @db.Uuid
+  idempotencyKey String?      @map("idempotency_key") @db.VarChar(160)
   salesOrder    SalesOrder?   @relation(fields: [salesOrderId], references: [id], onDelete: SetNull)
   items         InvoiceItem[]
   receiptAllocations CustomerReceiptAllocation[]
@@ -337,6 +338,7 @@ model Invoice {
 
   @@unique([tenantId, invoiceNumber])
   @@unique([tenantId, salesOrderId])
+  @@unique([tenantId, idempotencyKey])
   @@index([tenantId, status, dueDate])
   @@index([tenantId, customerId, issueDate])
   @@map("invoices")
