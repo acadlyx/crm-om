@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Prisma } from "@/generated/prisma/client";
 import { requireWorkspaceAccess, writeAuditEvent } from "@/lib/crm/access";
 import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { db } from "@/lib/db";
@@ -17,6 +18,75 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
 
   try {
     let updated: { count: number } | null = null;
+    if (resource === "payments") {
+      if (access.user.role !== "TENANT_ADMIN" && access.user.role !== "PLATFORM_ADMIN") {
+        return Response.json({ error: { message: "Only the business owner can reverse a posted payment." } }, { status: 403 });
+      }
+      const parsed = z.object({ status: z.literal("REVERSED"), reason: z.string().trim().min(3).max(1000) }).strict().safeParse(body);
+      if (!parsed.success) return Response.json({ error: { message: "A reversal reason of at least 3 characters is required." } }, { status: 400 });
+      const result = await db.$transaction(async (tx) => {
+        const payment = await tx.payment.findFirst({
+          where: { id, tenantId: access.tenantId },
+          include: {
+            invoice: {
+              select: {
+                id: true, customerId: true, total: true, dueDate: true, status: true,
+                payments: { select: { id: true, amount: true, status: true } },
+                receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } },
+              },
+            },
+          },
+        });
+        if (!payment) return { kind: "NOT_FOUND" as const };
+        if (payment.status === "REVERSED") return { kind: "ALREADY_REVERSED" as const };
+        if (payment.status !== "POSTED") return { kind: "NOT_POSTED" as const };
+
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: "REVERSED", notes: [payment.notes, "Reversal: " + parsed.data.reason].filter(Boolean).join("\n") },
+        });
+
+        const legacyPaid = payment.invoice.payments
+          .filter((entry) => entry.status === "POSTED" && entry.id !== payment.id)
+          .reduce((sum, entry) => sum + Number(entry.amount), 0);
+        const allocatedPaid = payment.invoice.receiptAllocations
+          .filter((entry) => entry.receipt.status === "POSTED")
+          .reduce((sum, entry) => sum + Number(entry.amount), 0);
+        const paidAfter = legacyPaid + allocatedPaid;
+        const nextStatus = paidAfter + 0.005 >= Number(payment.invoice.total)
+          ? "PAID"
+          : paidAfter > 0
+            ? "PARTIALLY_PAID"
+            : payment.invoice.status === "DRAFT"
+              ? "DRAFT"
+              : payment.invoice.dueDate < new Date()
+                ? "OVERDUE"
+                : "SENT";
+        await tx.invoice.update({ where: { id: payment.invoiceId }, data: { status: nextStatus } });
+        await tx.ledgerEntry.create({
+          data: {
+            tenantId: access.tenantId, customerId: payment.invoice.customerId,
+            entryType: "CUSTOMER_PAYMENT_REVERSAL", referenceType: "PAYMENT", referenceId: payment.id,
+            description: "Reversal of payment against invoice " + payment.invoiceId,
+            debit: payment.amount, credit: 0, idempotencyKey: "payment-reversal-" + payment.id,
+            createdByUserId: access.user.id,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            actorUserId: access.user.id, action: "CUSTOMER_PAYMENT_REVERSED",
+            entityType: "Payment", entityId: payment.id,
+            metadata: { invoiceId: payment.invoiceId, amount: Number(payment.amount), reason: parsed.data.reason },
+          },
+        });
+        return { kind: "REVERSED" as const };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      if (result.kind === "NOT_FOUND") return Response.json({ error: { message: "Payment not found in this workspace." } }, { status: 404 });
+      if (result.kind === "ALREADY_REVERSED") return Response.json({ error: { message: "This payment was already reversed." } }, { status: 409 });
+      if (result.kind === "NOT_POSTED") return Response.json({ error: { message: "Only a posted payment can be reversed." } }, { status: 409 });
+      return Response.json({ data: { id, status: "REVERSED" } });
+    }
+
     if (resource === "leads" && body.status === "CONVERTED") {
       const conversion = await db.$transaction(async (tx) => {
         const lead = await tx.lead.findFirst({
