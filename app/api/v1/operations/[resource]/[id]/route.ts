@@ -142,6 +142,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
             data: { deliveredQuantity: { increment: item.quantity } },
           });
           if (!advanced.count) throw new Error("DELIVERY_EXCEEDS_ORDERED");
+          await tx.deliveryItem.update({
+            where: { id: item.id },
+            data: { unitCost: item.product.purchaseCost },
+          });
           await tx.inventoryMovement.create({ data: {
             tenantId, productId: item.productId, movementType: "SALE_ISSUE", quantity: item.quantity,
             unitCost: item.product.purchaseCost, referenceType: "DELIVERY", referenceId: delivery.id,
