@@ -327,8 +327,8 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
         }
       }
       await load();
-      const summary = "Statement processed: " + imported + " reconciled, " + skipped + " unmatched/skipped, " + issues.length + " needing attention.";
       if (matched > imported + issues.length) skipped += matched - imported - issues.length;
+      const summary = "Statement processed: " + imported + " reconciled, " + skipped + " unmatched/skipped, " + issues.length + " needing attention.";
       setNotice(issues.length ? summary + " First issue: " + issues[0] : summary);
       if (issues.length) setError("Some statement rows were not reconciled. Review the report and retry only after checking the bank history.");
       else if (!imported) setNotice("No payments matched pending QR references. Confirm the CSV columns and transaction references.");
