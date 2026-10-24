@@ -4,7 +4,7 @@ import { LogoutButton } from "@/components/logout-button";
 import type { Branding } from "@/lib/branding/defaults";
 import {
   Activity, Bell, BookOpen, Boxes, Building2, CheckSquare, ClipboardList,
-  ContactRound, CreditCard, FileText, Gauge, HandCoins, KanbanSquare, Package,
+  ContactRound, CreditCard, FileText, Gauge, HandCoins, KanbanSquare, Package, QrCode,
   Palette, ShieldCheck, ShoppingCart, Truck, Users, Wallet,
 } from "lucide-react";
 
@@ -59,6 +59,7 @@ export function AppSidebar({ branding, role, tenantId }: { branding: Branding; r
             <p className="sidebar-section-label">MONEY & ACCOUNTS</p>
             {canCollections && <Link className="sidebar-link" href="/crm/payments"><HandCoins size={17} aria-hidden="true" />Payments received</Link>}
             {canCollections && <Link className="sidebar-link" href="/operations/customer-receipts"><CreditCard size={17} aria-hidden="true" />Receipts & allocations</Link>}
+            {canCollections && <Link className="sidebar-link" href="/operations/upi-collections"><QrCode size={17} aria-hidden="true" />UPI QR & reconciliation</Link>}
             {canFinance && <Link className="sidebar-link" href="/operations/supplier-bills"><FileText size={17} aria-hidden="true" />Supplier bills</Link>}
             {canFinance && <Link className="sidebar-link" href="/operations/supplier-payments"><Wallet size={17} aria-hidden="true" />Supplier payments</Link>}
             {canFinance && <Link className="sidebar-link" href="/operations/ledger"><BookOpen size={17} aria-hidden="true" />Ledgers & accounts</Link>}
