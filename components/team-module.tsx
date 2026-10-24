@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { CheckCircle2, CircleAlert, LoaderCircle, Plus, RefreshCw, Search, ShieldCheck, UserCheck, UserMinus, Users, X } from "lucide-react";
+import { CheckCircle2, CircleAlert, LoaderCircle, Plus, RefreshCw, Search, ShieldCheck, Trash2, UserCheck, UserMinus, Users, X } from "lucide-react";
 import { PasswordInput } from "@/components/password-input";
 
 type TeamRole = "STAFF" | "SALES" | "DELIVERY" | "COLLECTIONS" | "INVENTORY_MANAGER" | "ACCOUNTANT";
@@ -79,6 +79,26 @@ export function TeamModule() {
     }
   }
 
+  async function deleteMember(member: TeamMember) {
+    if (member.isActive) {
+      setError("Deactivate this account before attempting deletion.");
+      return;
+    }
+    if (!window.confirm("Delete the inactive account for " + member.name + "? Accounts with assignments or notifications are retained for audit.")) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch("/api/v1/operations/team/" + encodeURIComponent(member.id), { method: "DELETE", cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error?.message || "Could not delete this team member.");
+      setMembers((current) => current.filter((item) => item.id !== member.id));
+      setNotice("Inactive team account deleted. The action was recorded in the audit log.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not delete this team member.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function update(member: TeamMember, patch: { isActive?: boolean; role?: TeamRole }) {
     const action = patch.isActive === undefined ? "change this team member's role" : patch.isActive ? "reactivate this account" : "deactivate this account";
     if (!window.confirm("Confirm you want to " + action + " for " + member.name + "? Changes are recorded in the audit log.")) return;
@@ -143,7 +163,7 @@ export function TeamModule() {
                 <td><span className={"crm-pill " + (member.isActive ? "crm-pill-active" : "crm-pill-overdue")}>{member.isActive ? "Active" : "Inactive"}</span></td>
                 <td>{niceDate(member.createdAt)}</td>
                 <td><select aria-label={"Role for " + member.name} className="workflow-select operations-status-filter" value={member.role} disabled={!member.isActive} onChange={(event) => void update(member, { role: event.target.value as TeamRole })}>{roles.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></td>
-                <td><button type="button" className={"crm-secondary-button " + (member.isActive ? "is-danger" : "")} onClick={() => void update(member, { isActive: !member.isActive })}>{member.isActive ? "Deactivate" : "Reactivate"}</button></td>
+                <td><div className="operations-row-actions"><button type="button" className={"crm-secondary-button " + (member.isActive ? "is-danger" : "")} disabled={busy} onClick={() => void update(member, { isActive: !member.isActive })}>{member.isActive ? "Deactivate" : "Reactivate"}</button><button type="button" className="crm-secondary-button is-danger" disabled={busy || member.isActive} title={member.isActive ? "Deactivate this account before deletion" : "Delete inactive account"} onClick={() => void deleteMember(member)}><Trash2 size={14}/>Delete</button></div></td>
               </tr>)}</tbody>
             </table></div>
             {filtered.length > 3 && <div className="operations-table-footer"><span>Showing {showAll ? filtered.length : 3} of {filtered.length} team members</span><button type="button" className="crm-secondary-button" onClick={() => setShowAll(!showAll)}>{showAll ? "Show fewer" : "Show more"}</button></div>}
