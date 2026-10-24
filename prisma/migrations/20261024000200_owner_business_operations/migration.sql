@@ -60,7 +60,7 @@ CREATE TABLE "products" (
   "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT "products_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "products_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "products_tenant_sku_key" UNIQUE ("tenant_id","sku"),
+  CONSTRAINT "products_tenant_id_sku_key" UNIQUE ("tenant_id","sku"),
   CONSTRAINT "products_nonnegative_stock_check" CHECK ("stock_on_hand" >= 0),
   CONSTRAINT "products_nonnegative_prices_check" CHECK ("purchase_cost" >= 0 AND "selling_price" >= 0 AND "reorder_level" >= 0)
 );
@@ -110,7 +110,7 @@ CREATE TABLE "sales_orders" (
   CONSTRAINT "sales_orders_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "sales_orders_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "sales_orders_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT "sales_orders_tenant_order_number_key" UNIQUE ("tenant_id","order_number"),
+  CONSTRAINT "sales_orders_tenant_id_order_number_key" UNIQUE ("tenant_id","order_number"),
   CONSTRAINT "sales_orders_totals_nonnegative_check" CHECK ("subtotal" >= 0 AND "discount_amount" >= 0 AND "tax_amount" >= 0 AND "total" >= 0)
 );
 CREATE UNIQUE INDEX "sales_orders_tenant_id_idempotency_key_key" ON "sales_orders"("tenant_id","idempotency_key");
@@ -176,7 +176,7 @@ CREATE TABLE "purchase_orders" (
   CONSTRAINT "purchase_orders_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "purchase_orders_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "purchase_orders_supplier_id_fkey" FOREIGN KEY ("supplier_id") REFERENCES "suppliers"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT "purchase_orders_tenant_order_number_key" UNIQUE ("tenant_id","order_number"),
+  CONSTRAINT "purchase_orders_tenant_id_order_number_key" UNIQUE ("tenant_id","order_number"),
   CONSTRAINT "purchase_orders_totals_nonnegative_check" CHECK ("subtotal" >= 0 AND "tax_amount" >= 0 AND "total" >= 0)
 );
 CREATE UNIQUE INDEX "purchase_orders_tenant_id_idempotency_key_key" ON "purchase_orders"("tenant_id","idempotency_key");
@@ -215,7 +215,7 @@ CREATE TABLE "goods_receipts" (
   CONSTRAINT "goods_receipts_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "goods_receipts_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "goods_receipts_purchase_order_id_fkey" FOREIGN KEY ("purchase_order_id") REFERENCES "purchase_orders"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT "goods_receipts_tenant_receipt_number_key" UNIQUE ("tenant_id","receipt_number")
+  CONSTRAINT "goods_receipts_tenant_id_receipt_number_key" UNIQUE ("tenant_id","receipt_number")
 );
 CREATE UNIQUE INDEX "goods_receipts_tenant_id_idempotency_key_key" ON "goods_receipts"("tenant_id","idempotency_key");
 CREATE INDEX "goods_receipts_tenant_received_at_idx" ON "goods_receipts"("tenant_id","received_at");
@@ -256,7 +256,7 @@ CREATE TABLE "deliveries" (
   CONSTRAINT "deliveries_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "deliveries_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "sales_orders"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "deliveries_assigned_user_id_fkey" FOREIGN KEY ("assigned_user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT "deliveries_tenant_delivery_number_key" UNIQUE ("tenant_id","delivery_number")
+  CONSTRAINT "deliveries_tenant_id_delivery_number_key" UNIQUE ("tenant_id","delivery_number")
 );
 CREATE UNIQUE INDEX "deliveries_tenant_id_idempotency_key_key" ON "deliveries"("tenant_id","idempotency_key");
 CREATE INDEX "deliveries_tenant_status_scheduled_idx" ON "deliveries"("tenant_id","status","scheduled_at");
@@ -273,7 +273,7 @@ CREATE TABLE "delivery_items" (
   CONSTRAINT "delivery_items_order_item_id_fkey" FOREIGN KEY ("order_item_id") REFERENCES "sales_order_items"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "delivery_items_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "delivery_items_quantity_positive_check" CHECK ("quantity" > 0),
-  CONSTRAINT "delivery_items_delivery_order_item_key" UNIQUE ("delivery_id","order_item_id")
+  CONSTRAINT "delivery_items_delivery_id_order_item_id_key" UNIQUE ("delivery_id","order_item_id")
 );
 CREATE INDEX "delivery_items_product_id_idx" ON "delivery_items"("product_id");
 
@@ -294,7 +294,7 @@ CREATE TABLE "customer_receipts" (
   CONSTRAINT "customer_receipts_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "customer_receipts_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "customer_receipts_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT "customer_receipts_tenant_receipt_number_key" UNIQUE ("tenant_id","receipt_number"),
+  CONSTRAINT "customer_receipts_tenant_id_receipt_number_key" UNIQUE ("tenant_id","receipt_number"),
   CONSTRAINT "customer_receipts_amount_positive_check" CHECK ("amount" > 0)
 );
 CREATE UNIQUE INDEX "customer_receipts_tenant_id_idempotency_key_key" ON "customer_receipts"("tenant_id","idempotency_key");
@@ -308,7 +308,7 @@ CREATE TABLE "customer_receipt_allocations" (
   CONSTRAINT "customer_receipt_allocations_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "customer_receipt_allocations_receipt_id_fkey" FOREIGN KEY ("receipt_id") REFERENCES "customer_receipts"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "customer_receipt_allocations_invoice_id_fkey" FOREIGN KEY ("invoice_id") REFERENCES "invoices"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT "customer_receipt_allocations_receipt_invoice_key" UNIQUE ("receipt_id","invoice_id"),
+  CONSTRAINT "customer_receipt_allocations_receipt_id_invoice_id_key" UNIQUE ("receipt_id","invoice_id"),
   CONSTRAINT "customer_receipt_allocations_amount_positive_check" CHECK ("amount" > 0)
 );
 CREATE INDEX "customer_receipt_allocations_invoice_id_idx" ON "customer_receipt_allocations"("invoice_id");
@@ -336,7 +336,7 @@ CREATE TABLE "supplier_bills" (
   CONSTRAINT "supplier_bills_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "supplier_bills_supplier_id_fkey" FOREIGN KEY ("supplier_id") REFERENCES "suppliers"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "supplier_bills_purchase_order_id_fkey" FOREIGN KEY ("purchase_order_id") REFERENCES "purchase_orders"("id") ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT "supplier_bills_tenant_bill_number_key" UNIQUE ("tenant_id","bill_number"),
+  CONSTRAINT "supplier_bills_tenant_id_bill_number_key" UNIQUE ("tenant_id","bill_number"),
   CONSTRAINT "supplier_bills_total_nonnegative_check" CHECK ("total" >= 0)
 );
 CREATE INDEX "supplier_bills_tenant_status_due_idx" ON "supplier_bills"("tenant_id","status","due_date");
@@ -371,7 +371,7 @@ CREATE TABLE "supplier_payment_allocations" (
   CONSTRAINT "supplier_payment_allocations_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "supplier_payment_allocations_payment_id_fkey" FOREIGN KEY ("payment_id") REFERENCES "supplier_payments"("id") ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT "supplier_payment_allocations_bill_id_fkey" FOREIGN KEY ("bill_id") REFERENCES "supplier_bills"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT "supplier_payment_allocations_payment_bill_key" UNIQUE ("payment_id","bill_id"),
+  CONSTRAINT "supplier_payment_allocations_payment_id_bill_id_key" UNIQUE ("payment_id","bill_id"),
   CONSTRAINT "supplier_payment_allocations_amount_positive_check" CHECK ("amount" > 0)
 );
 CREATE INDEX "supplier_payment_allocations_bill_id_idx" ON "supplier_payment_allocations"("bill_id");
@@ -413,7 +413,7 @@ CREATE TABLE "role_permissions" (
   "updated_by_user_id" UUID,
   CONSTRAINT "role_permissions_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "role_permissions_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "role_permissions_tenant_role_module_action_key" UNIQUE ("tenant_id","role","module_key","action_key")
+  CONSTRAINT "role_permissions_tenant_id_role_module_key_action_key_key" UNIQUE ("tenant_id","role","module_key","action_key")
 );
 CREATE INDEX "role_permissions_tenant_role_idx" ON "role_permissions"("tenant_id","role");
 
