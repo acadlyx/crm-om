@@ -85,7 +85,9 @@ export async function POST(request: Request) {
         const same = existing.upiId.toLowerCase() === values.upiId.toLowerCase()
           && Math.round(Number(existing.amount) * 100) === Math.round(values.amount * 100)
           && (existing.invoiceId ?? null) === (values.invoiceId ?? null)
-          && (existing.customerId ?? null) === (values.customerId ?? null);
+          && (existing.customerId ?? null) === (values.customerId ?? null)
+          && (existing.payerName ?? null) === (values.payerName || null)
+          && (existing.notes ?? null) === (values.notes || null);
         if (!same) throw new Error("IDEMPOTENCY_KEY_CONFLICT");
         return { row: existing, replay: true as const };
       }
