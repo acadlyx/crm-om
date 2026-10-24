@@ -12,15 +12,18 @@ describe("branding authorization helpers", () => {
     expect(canManagePlatformBranding("STAFF")).toBe(false);
     expect(canManagePlatformBranding(undefined)).toBe(false);
   });
-  it("requires a tenant admin role and a tenant scope", () => {
+  it("requires an assigned tenant scope for business settings", () => {
     expect(canManageTenantSettings("TENANT_ADMIN","tenant-a")).toBe(true);
     expect(canManageTenantSettings("TENANT_ADMIN",null)).toBe(false);
-    expect(canManageTenantSettings("PLATFORM_ADMIN","tenant-a")).toBe(false);
+    expect(canManageTenantSettings("PLATFORM_ADMIN","tenant-a")).toBe(true);
+    expect(canManageTenantSettings("PLATFORM_ADMIN",null)).toBe(false);
   });
   it("never switches tenant using a browser-supplied identifier", () => {
     expect(tenantScopeForSession("TENANT_ADMIN","tenant-a")).toBe("tenant-a");
     expect(tenantScopeForSession("TENANT_ADMIN","tenant-a","tenant-a")).toBe("tenant-a");
     expect(tenantScopeForSession("TENANT_ADMIN","tenant-a","tenant-b")).toBeNull();
-    expect(tenantScopeForSession("PLATFORM_ADMIN","tenant-a","tenant-a")).toBeNull();
+    expect(tenantScopeForSession("PLATFORM_ADMIN","tenant-a","tenant-a")).toBe("tenant-a");
+    expect(tenantScopeForSession("PLATFORM_ADMIN","tenant-a","tenant-b")).toBeNull();
+    expect(tenantScopeForSession("PLATFORM_ADMIN",null,"tenant-a")).toBeNull();
   });
 });
