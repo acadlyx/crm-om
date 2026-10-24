@@ -150,6 +150,8 @@ export async function POST(request: Request, context: { params: Promise<{ resour
   if (!parsed.success) {
     return Response.json({ error: { message: parsed.error.issues[0]?.message || "Check the entered details." } }, { status: 400 });
   }
+  // The selected Zod validator narrows and validates the resource-specific input at runtime.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = parsed.data as Record<string, any>;
   const tenantId = access.tenantId;
 

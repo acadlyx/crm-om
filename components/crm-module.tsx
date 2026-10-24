@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight, ArrowUpRight, CheckCircle2, CircleAlert, LoaderCircle,
@@ -70,8 +70,6 @@ export function CrmModule({
   const [busyRow, setBusyRow] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-
-  useEffect(() => setRows(initialRows), [initialRows]);
 
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();

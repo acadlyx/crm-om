@@ -263,5 +263,5 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       notFound();
   }
 
-  return <CrmModule resource={resource} title={title} description={description} fields={fields} columns={columns} initialRows={rows} workflow={workflow} recordLabel={recordLabel} />;
+  return <CrmModule key={JSON.stringify(rows)} resource={resource} title={title} description={description} fields={fields} columns={columns} initialRows={rows} workflow={workflow} recordLabel={recordLabel} />;
 }

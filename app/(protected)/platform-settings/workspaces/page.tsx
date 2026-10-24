@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
-import { Building2, Users, ArrowUpRight } from "lucide-react";
+import { Building2, Users } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { WorkspaceForm } from "@/components/workspace-form";
