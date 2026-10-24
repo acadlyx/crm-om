@@ -59,6 +59,71 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
       return Response.json({ data: { id, updated: true } });
     }
 
+    if (resource === "sales-orders" && body.action === "ISSUE_INVOICE") {
+      const invoicePermission = await requireWorkspacePermission(access, "invoices", "create");
+      if (!invoicePermission.ok) return fail(invoicePermission.message, invoicePermission.status);
+      const result = await db.$transaction(async (tx) => {
+        const existing = await tx.invoice.findFirst({
+          where: { tenantId, salesOrderId: id },
+          select: { id: true, invoiceNumber: true, total: true, status: true },
+        });
+        if (existing) return { kind: "EXISTING" as const, invoice: existing };
+        const order = await tx.salesOrder.findFirst({
+          where: { id, tenantId },
+          include: {
+            customer: { select: { id: true, name: true, paymentTermsDays: true } },
+            items: true,
+          },
+        });
+        if (!order) return { kind: "NOT_FOUND" as const };
+        if (!["CONFIRMED", "PARTIALLY_DELIVERED", "DELIVERED"].includes(order.status)) {
+          return { kind: "INVALID_STATUS" as const };
+        }
+        const issueDate = new Date();
+        const dueDate = new Date(issueDate);
+        dueDate.setDate(dueDate.getDate() + Math.max(0, order.customer.paymentTermsDays));
+        const invoiceNumber = "INV-" + issueDate.toISOString().slice(0, 10).replace(/-/g, "") + "-" + crypto.randomUUID().slice(0, 8).toUpperCase();
+        const invoice = await tx.invoice.create({
+          data: {
+            tenantId,
+            customerId: order.customerId,
+            salesOrderId: order.id,
+            invoiceNumber,
+            issueDate,
+            dueDate,
+            subtotal: order.subtotal,
+            discountAmount: order.discountAmount,
+            taxAmount: order.taxAmount,
+            total: order.total,
+            status: "SENT",
+            notes: "Issued from sales order " + order.orderNumber,
+            items: {
+              create: order.items.map((item) => ({
+                productId: item.productId,
+                description: item.description || "Product",
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                discountAmount: item.discountAmount,
+                taxAmount: item.taxAmount,
+                lineTotal: item.lineTotal,
+              })),
+            },
+          },
+          select: { id: true, invoiceNumber: true, total: true, status: true },
+        });
+        await audit(tx, actorId, "SALES_ORDER_INVOICE_ISSUED", "Invoice", invoice.id, {
+          salesOrderId: order.id,
+          orderNumber: order.orderNumber,
+          invoiceNumber: invoice.invoiceNumber,
+          total: n(invoice.total),
+        });
+        return { kind: "CREATED" as const, invoice };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      if (result.kind === "NOT_FOUND") return fail("Sales order not found in this workspace.", 404);
+      if (result.kind === "INVALID_STATUS") return fail("Confirm the sales order before issuing its invoice.", 409);
+      return Response.json({ data: result.invoice, idempotentReplay: result.kind === "EXISTING" }, { status: result.kind === "EXISTING" ? 200 : 201 });
+    }
+
     if (resource === "sales-orders") {
       const parsed = z.object({ status: z.enum(["CONFIRMED", "CANCELLED"]) }).strict().safeParse(body);
       if (!parsed.success) return fail("Choose CONFIRMED or CANCELLED.");
