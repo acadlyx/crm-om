@@ -21,7 +21,7 @@ export async function requirePlatformAdmin() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return { ok: false as const, status: 401, user: null };
   const user = await db.user.findUnique({ where: { email: session.user.email } });
-  if (!user) return { ok: false as const, status: 401, user: null };
+  if (!user || !user.isActive) return { ok: false as const, status: 401, user: null };
   if (!canManagePlatformBranding(user.role)) return { ok: false as const, status: 403, user: null };
   return { ok: true as const, user };
 }
