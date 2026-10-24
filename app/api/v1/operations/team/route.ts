@@ -10,13 +10,13 @@ function fail(message: string, status = 400) {
 }
 function ownerRole(role: string) { return role === "TENANT_ADMIN" || role === "PLATFORM_ADMIN"; }
 
-export async function GET() {
+export async function GET(request: Request) {
   const access = await requireWorkspaceAccess();
   if (!access.ok) return fail(access.message, access.status);
-  if (!ownerRole(access.user.role)) return fail("Only the business owner can manage team accounts.", 403);
+  const includeInactive = new URL(request.url).searchParams.get("includeInactive") === "true" && ownerRole(access.user.role);
   try {
     const users = await db.user.findMany({
-      where: { tenantId: access.tenantId },
+      where: { tenantId: access.tenantId, ...(includeInactive ? {} : { isActive: true }) },
       select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
       orderBy: [{ isActive: "desc" }, { name: "asc" }],
       take: 500,
