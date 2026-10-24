@@ -3,6 +3,7 @@ import { requireWorkspaceAccess } from "@/lib/crm/access";
 import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { db } from "@/lib/db";
 import { normalizeReceiptTemplate } from "@/lib/receipts/template";
+import { getPlatformBranding } from "@/lib/branding/service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -132,6 +133,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   if (!access.ok) return Response.json({ error: { message: access.message } }, { status: access.status });
 
   const permission = await requireWorkspacePermission(access, "customer-receipts", "read");
+  const platformBranding = await getPlatformBranding();
   if (!permission.ok) return Response.json({ error: { message: permission.message } }, { status: permission.status });
 
   const { id } = await context.params;
@@ -158,8 +160,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const pdf = await PDFDocument.create();
   pdf.setTitle(template.title + " - " + receipt.receiptNumber);
   pdf.setSubject("Customer payment receipt");
-  pdf.setCreator(settings?.businessName || "Business CRM");
-  pdf.setProducer("Business CRM");
+  pdf.setCreator(settings?.businessName || platformBranding.productName);
+  pdf.setProducer(platformBranding.productName);
   const normal = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const italic = await pdf.embedFont(StandardFonts.HelveticaOblique);
@@ -307,7 +309,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     page.drawText(pdfText(template.signatureLabel), { x: PAGE_WIDTH - MARGIN - 170, y: lineY - 14, size: 8, font: normal, color: MUTED });
   }
   page.drawLine({ start: { x: MARGIN, y: 38 }, end: { x: PAGE_WIDTH - MARGIN, y: 38 }, thickness: 0.5, color: LIGHT_BORDER });
-  page.drawText(businessName + "  |  Generated from Business CRM", { x: MARGIN, y: 24, size: 7, font: normal, color: MUTED });
+  page.drawText(businessName + "  |  Generated from " + platformBranding.productName, { x: MARGIN, y: 24, size: 7, font: normal, color: MUTED });
 
   const bytes = await pdf.save();
   const safeNumber = pdfText(receipt.receiptNumber).replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 48) || "receipt";
