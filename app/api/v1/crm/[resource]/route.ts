@@ -101,7 +101,7 @@ async function getRows(resource: string, tenantId: string) {
     case "invoices":
       return db.invoice.findMany({
         where: { tenantId }, orderBy: { createdAt: "desc" }, take: 100,
-        include: { customer: { select: { id: true, name: true, company: true } }, payments: { select: { amount: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } },
+        include: { customer: { select: { id: true, name: true, company: true } }, payments: { select: { amount: true, status: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } },
       });
     case "payments":
       return db.payment.findMany({
@@ -162,6 +162,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
 
   try {
     let created: { id: string } | null = null;
+    let auditRecorded = false;
     switch (resource) {
       case "customers":
         created = await db.customer.create({
@@ -191,35 +192,48 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         break;
       }
       case "invoices": {
-        const customer = await db.customer.findFirst({ where: { id: data.customerId, tenantId }, select: { id: true } });
-        if (!customer) return Response.json({ error: { message: "Select a customer from your own workspace." } }, { status: 400 });
         const issueDate = data.issueDate ?? new Date();
         const dueDate = data.dueDate ?? new Date(issueDate.getTime() + 14 * 24 * 60 * 60 * 1000);
         const subtotal = Number(data.subtotal);
         const taxAmount = Number(data.taxAmount ?? 0);
         const total = Math.round((subtotal + taxAmount + Number.EPSILON) * 100) / 100;
         const invoiceNumber = "INV-" + issueDate.toISOString().slice(0, 10).replace(/-/g, "") + "-" + crypto.randomUUID().slice(0, 6).toUpperCase();
-        created = await db.invoice.create({
-          data: { tenantId, customerId: data.customerId, invoiceNumber, issueDate, dueDate, subtotal, taxAmount, total, status: "SENT", notes: data.notes ?? null },
-          select: { id: true },
-        });
+        const result = await db.$transaction(async (tx) => {
+          const customer = await tx.customer.findFirst({ where: { id: data.customerId, tenantId }, select: { id: true } });
+          if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
+          const invoice = await tx.invoice.create({
+            data: { tenantId, customerId: data.customerId, invoiceNumber, issueDate, dueDate, subtotal, taxAmount, total, status: "SENT", notes: data.notes ?? null },
+            select: { id: true },
+          });
+          await tx.ledgerEntry.create({ data: {
+            tenantId, customerId: customer.id, entryType: "SALES_INVOICE", referenceType: "INVOICE", referenceId: invoice.id,
+            description: "Sales invoice " + invoiceNumber, debit: total, credit: 0, idempotencyKey: "invoice-" + invoice.id, createdByUserId: access.user.id,
+          } });
+          await tx.auditLog.create({ data: { actorUserId: access.user.id, action: "CREATE", entityType: "INVOICE", entityId: invoice.id, metadata: { invoiceNumber, total } } });
+          return invoice;
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        created = result;
+        auditRecorded = true;
         break;
       }
       case "payments": {
         created = await db.$transaction(async (tx) => {
           const invoice = await tx.invoice.findFirst({
             where: { id: data.invoiceId, tenantId, status: { not: "CANCELLED" } },
-            include: { payments: { select: { amount: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } },
+            include: {
+              payments: { select: { amount: true, status: true } },
+              receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } },
+            },
           });
           if (!invoice) throw new Error("INVOICE_NOT_FOUND");
-          const legacyReceived = invoice.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+          const legacyReceived = invoice.payments.filter((payment) => payment.status === "POSTED").reduce((sum, payment) => sum + Number(payment.amount), 0);
           const allocatedReceived = invoice.receiptAllocations.filter((allocation) => allocation.receipt.status === "POSTED").reduce((sum, allocation) => sum + Number(allocation.amount), 0);
           const received = legacyReceived + allocatedReceived;
           const balance = Math.max(0, Number(invoice.total) - received);
           const amount = Number(data.amount);
           if (amount > balance + 0.005) throw new Error("PAYMENT_EXCEEDS_BALANCE");
           const payment = await tx.payment.create({
-            data: { tenantId, invoiceId: invoice.id, amount, method: data.method, reference: data.reference ?? null, paidAt: data.paidAt ?? new Date(), notes: data.notes ?? null },
+            data: { tenantId, invoiceId: invoice.id, amount, method: data.method, reference: data.reference ?? null, paidAt: data.paidAt ?? new Date(), notes: data.notes ?? null, status: "POSTED" },
             select: { id: true },
           });
           const paidAfter = received + amount;
@@ -227,16 +241,29 @@ export async function POST(request: Request, context: { params: Promise<{ resour
             where: { id: invoice.id },
             data: { status: paidAfter + 0.005 >= Number(invoice.total) ? "PAID" : "PARTIALLY_PAID" },
           });
+          await tx.ledgerEntry.create({ data: {
+            tenantId, customerId: invoice.customerId, entryType: "CUSTOMER_PAYMENT",
+            referenceType: "PAYMENT", referenceId: payment.id, description: "Payment against invoice " + invoice.invoiceNumber,
+            debit: 0, credit: amount, idempotencyKey: "payment-" + payment.id, createdByUserId: access.user.id,
+          } });
+          await tx.auditLog.create({ data: { actorUserId: access.user.id, action: "CUSTOMER_PAYMENT_POSTED", entityType: "Payment", entityId: payment.id, metadata: { invoiceId: invoice.id, amount } } });
           return payment;
-        });
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        auditRecorded = true;
         break;
       }
-      case "expenses":
-        created = await db.expense.create({
-          data: { tenantId, title: data.title, category: data.category || "General", amount: data.amount, spentAt: data.spentAt ?? new Date(), vendor: data.vendor ?? null, method: data.method ?? "OTHER", status: data.status ?? "PAID", notes: data.notes ?? null },
-          select: { id: true },
+      case "expenses": {
+        created = await db.$transaction(async (tx) => {
+          const expense = await tx.expense.create({
+            data: { tenantId, title: data.title, category: data.category || "General", amount: data.amount, spentAt: data.spentAt ?? new Date(), vendor: data.vendor ?? null, method: data.method ?? "OTHER", status: data.status ?? "PAID", notes: data.notes ?? null },
+            select: { id: true },
+          });
+          await tx.auditLog.create({ data: { actorUserId: access.user.id, action: "CREATE", entityType: "EXPENSE", entityId: expense.id, metadata: { amount: data.amount, category: data.category || "General" } } });
+          return expense;
         });
+        auditRecorded = true;
         break;
+      }
       case "tasks": {
         if (data.customerId) {
           const customer = await db.customer.findFirst({ where: { id: data.customerId, tenantId }, select: { id: true } });
@@ -250,7 +277,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
       }
     }
 
-    if (created) {
+    if (created && !auditRecorded) {
       await writeAuditEvent({
         actorUserId: access.user.id,
         action: "CREATE",
@@ -261,6 +288,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
     return Response.json({ data: { id: created?.id } }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
+    if (message === "CUSTOMER_NOT_FOUND") return Response.json({ error: { message: "Select a customer from your own workspace." } }, { status: 400 });
     if (message === "INVOICE_NOT_FOUND") {
       return Response.json({ error: { message: "That invoice was not found in this workspace or cannot receive payments." } }, { status: 404 });
     }
