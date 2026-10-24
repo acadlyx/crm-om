@@ -54,6 +54,7 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
   const [activeQr, setActiveQr] = useState<ActiveQr | null>(null);
   const [utrDrafts, setUtrDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [schemaUnavailable, setSchemaUnavailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [busyRow, setBusyRow] = useState("");
   const [error, setError] = useState("");
@@ -63,6 +64,7 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    setSchemaUnavailable(false);
     try {
       const [historyResponse, customerResponse, invoiceResponse] = await Promise.all([
         fetch("/api/v1/operations/upi-collections", { cache: "no-store" }),
@@ -72,13 +74,17 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
       const [historyPayload, customerPayload, invoicePayload] = await Promise.all([
         historyResponse.json(), customerResponse.json(), invoiceResponse.json(),
       ]);
-      if (!historyResponse.ok) throw new Error(historyPayload?.error?.message || "UPI history could not be loaded.");
       if (!customerResponse.ok) throw new Error(customerPayload?.error?.message || "Customer choices could not be loaded.");
       if (!invoiceResponse.ok) throw new Error(invoicePayload?.error?.message || "Invoice choices could not be loaded.");
-      setRows((historyPayload.data || []) as Collection[]);
-      setBusinessName(String(historyPayload.business?.name || "Business"));
       setCustomers((customerPayload.data || []) as RecordRow[]);
       setInvoices((invoicePayload.data || []) as RecordRow[]);
+      if (!historyResponse.ok) {
+        const message = historyPayload?.error?.message || "UPI history could not be loaded.";
+        setSchemaUnavailable(historyResponse.status === 503 && /UPI collection storage is not initialized/i.test(message));
+        throw new Error(message);
+      }
+      setRows((historyPayload.data || []) as Collection[]);
+      setBusinessName(String(historyPayload.business?.name || "Business"));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "UPI history could not be loaded. Refresh and try again.");
     } finally {
@@ -321,7 +327,7 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
               <label className="field"><span>Notes (optional)</span><input maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Payment purpose" /></label>
             </div>
             <div className="crm-form-actions">
-              <button className="brand-button" type="submit" disabled={busy || loading}>{busy ? <LoaderCircle size={16} className="workspace-spinner" /> : <QrCode size={16} />}{busy ? "Creating QR…" : "Generate UPI QR"}</button>
+              <button className="brand-button" type="submit" disabled={busy || loading || schemaUnavailable}>{busy ? <LoaderCircle size={16} className="workspace-spinner" /> : <QrCode size={16} />}{busy ? "Creating QR…" : "Generate UPI QR"}</button>
               <span className="muted" style={{ fontSize: 12 }}>QR requests expire after 24 hours.</span>
             </div>
           </form>
@@ -348,7 +354,7 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
           <div><p className="dashboard-eyebrow">TRANSACTION HISTORY</p><h2>{rows.length} collection request{rows.length === 1 ? "" : "s"}</h2><p className="owner-table-caption">Only reconciled rows write to payments or receipts.</p></div>
           <div className="operations-table-actions">
             <label className="crm-search"><Search size={15} aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search reference, UTR, customer…" aria-label="Search UPI history" /></label>
-            <label className="crm-secondary-button" style={{ cursor: "pointer" }}><Upload size={14} />Import statement CSV<input type="file" accept=".csv,text/csv" onChange={(event) => void importStatement(event)} style={{ display: "none" }} /></label>
+            <label className="crm-secondary-button" style={{ cursor: "pointer" }}><Upload size={14} />Import statement CSV<input type="file" accept=".csv,text/csv" disabled={schemaUnavailable || loading} onChange={(event) => void importStatement(event)} style={{ display: "none" }} /></label>
           </div>
         </div>
         {loading ? <div className="operations-loading"><LoaderCircle size={19} className="workspace-spinner" />Loading UPI collection history…</div>
