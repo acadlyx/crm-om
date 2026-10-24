@@ -53,10 +53,10 @@ function dateLabel(value: Date | string) {
 }
 function number(value: unknown) { return Number(value ?? 0); }
 function invoicePaid(invoice: {
-  payments: Array<{ amount: unknown }>;
+  payments: Array<{ amount: unknown; status?: string }>;
   receiptAllocations: Array<{ amount: unknown; receipt: { status: string } }>;
 }) {
-  const legacy = invoice.payments.reduce((sum, payment) => sum + number(payment.amount), 0);
+  const legacy = invoice.payments.filter((payment) => !payment.status || payment.status === "POSTED").reduce((sum, payment) => sum + number(payment.amount), 0);
   const allocated = invoice.receiptAllocations.filter((entry) => entry.receipt.status === "POSTED").reduce((sum, entry) => sum + number(entry.amount), 0);
   return legacy + allocated;
 }
@@ -130,13 +130,13 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
         select: {
           id: true, invoiceNumber: true, total: true, issueDate: true, dueDate: true, status: true,
           customer: { select: { id: true, name: true } },
-          payments: { select: { amount: true, paidAt: true } },
+          payments: { select: { amount: true, paidAt: true, status: true } },
           receiptAllocations: { select: { amount: true, receipt: { select: { status: true, receivedAt: true } } } },
           items: { select: { productId: true, description: true, quantity: true, unitPrice: true, lineTotal: true } },
         },
         orderBy: { dueDate: "asc" }, take: 10000,
       }),
-      db.payment.findMany({ where: { tenantId, paidAt: { gte: start, lte: end } }, select: { id: true, amount: true, paidAt: true } , take: 10000 }),
+      db.payment.findMany({ where: { tenantId, status: "POSTED", paidAt: { gte: start, lte: end } }, select: { id: true, amount: true, paidAt: true, status: true } , take: 10000 }),
       db.customerReceipt.findMany({ where: { tenantId, status: "POSTED", receivedAt: { gte: start, lte: end } }, select: { id: true, amount: true, receivedAt: true }, take: 10000 }),
       db.product.findMany({ where: { tenantId, status: "ACTIVE" }, select: { id: true, sku: true, name: true, category: true, unit: true, stockOnHand: true, reorderLevel: true, purchaseCost: true, sellingPrice: true }, orderBy: { name: "asc" }, take: 10000 }),
       db.delivery.findMany({
