@@ -23,7 +23,7 @@ export const authOptions: NextAuthOptions = {
         const user = await db.user.findUnique({ where: { email: token.email } });
         if (user && user.isActive) {
           session.user.id = user.id;
-          session.user.role = user.role;
+          session.user.role = user.role as never;
           session.user.tenantId = user.tenantId;
         } else {
           // Invalidate existing JWT sessions for deactivated accounts.
