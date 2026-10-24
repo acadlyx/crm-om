@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
+import { LogoutButton } from "@/components/logout-button";
 import type { Branding } from "@/lib/branding/defaults";
 import {
   Activity, Bell, Building2, CheckSquare, FileText, Gauge, HandCoins,
@@ -34,6 +35,7 @@ export function AppSidebar({ branding, role, tenantId }: { branding: Branding; r
         <Link className="sidebar-link" href="/notifications"><Bell size={17} aria-hidden="true" />Notifications</Link>
         {isPlatformAdmin && <Link className="sidebar-link" href="/platform-settings/branding"><Palette size={17} aria-hidden="true" />Platform branding</Link>}
       </nav>
+      <LogoutButton />
     </aside>
   );
 }
