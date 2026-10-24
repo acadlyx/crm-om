@@ -1,7 +1,7 @@
 "use client";
 
 import QRCode from "qrcode";
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   AlertCircle, ArrowDownToLine, ArrowRight, CheckCircle2, Clipboard, LoaderCircle,
   QrCode, RefreshCw, Search, Upload, X,
@@ -29,6 +29,19 @@ type Collection = {
   invoice: { id: string; invoiceNumber: string; status: string; customer: { name: string } } | null;
 };
 type ActiveQr = { id: string; uri: string; image: string; amount: number; reference: string };
+type IdempotencyAttempt = { signature: string; key: string };
+
+function invoiceBalance(item: RecordRow): number {
+  const payments = Array.isArray(item.payments) ? item.payments as Array<Record<string, unknown>> : [];
+  const allocations = Array.isArray(item.receiptAllocations) ? item.receiptAllocations as Array<Record<string, unknown>> : [];
+  const paidFromPayments = payments.filter((payment) => payment.status === "POSTED")
+    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+  const paidFromAllocations = allocations.filter((allocation) => {
+    const receipt = allocation.receipt && typeof allocation.receipt === "object" ? allocation.receipt as Record<string, unknown> : {};
+    return receipt.status === "POSTED";
+  }).reduce((sum, allocation) => sum + Number(allocation.amount || 0), 0);
+  return Math.max(0, Number(item.total || 0) - paidFromPayments - paidFromAllocations);
+}
 
 const INR = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dateTime = (value: string | null | undefined) => {
@@ -101,6 +114,7 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
   const [busyRow, setBusyRow] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const idempotencyAttempt = useRef<IdempotencyAttempt | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -130,10 +144,9 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
 
   useEffect(() => { void load(); }, [load]);
 
-  const invoiceOptions = useMemo(() => invoices.filter((item) => {
-    const status = String(item.status || "");
-    return status !== "DRAFT" && status !== "CANCELLED" && Number(item.balance ?? (Number(item.total || 0) - Number(item.paidAmount || 0))) > 0.005;
-  }), [invoices]);
+  const invoiceOptions = useMemo(() => invoices
+    .map((item) => ({ item, balance: invoiceBalance(item) }))
+    .filter(({ item, balance }) => !["DRAFT", "CANCELLED"].includes(String(item.status || "")) && balance > 0.005), [invoices]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -171,7 +184,11 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
       }
       if (!invoiceId && !customerId) throw new Error("Choose an invoice or a customer so the payment can be reconciled.");
       const signature = JSON.stringify({ upiId: upiId.trim().toLowerCase(), amount: parsedAmount, invoiceId, customerId: invoiceId ? "" : customerId, payerName, notes });
-      const key = (window.crypto?.randomUUID?.() || (Date.now().toString(36) + Math.random().toString(36).slice(2))) + "-" + signature.length;
+      if (!idempotencyAttempt.current || idempotencyAttempt.current.signature !== signature) {
+        const key = window.crypto?.randomUUID?.() || (Date.now().toString(36) + Math.random().toString(36).slice(2));
+        idempotencyAttempt.current = { signature, key };
+      }
+      const key = idempotencyAttempt.current.key;
       const response = await fetch("/api/v1/operations/upi-collections", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -194,6 +211,7 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
       setRows((current) => [row, ...current.filter((item) => item.id !== row.id)]);
       setActiveQr({ id: row.id, uri, image, amount: Number(row.amount), reference: row.transactionRef });
       setNotice("UPI QR created. The transaction is pending until the bank statement / UTR is reconciled.");
+      idempotencyAttempt.current = null;
       setAmount("");
       setNotes("");
     } catch (cause) {
@@ -247,6 +265,18 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
       setError(cause instanceof Error ? cause.message : "Could not delete the pending QR request.");
     } finally {
       setBusyRow("");
+    }
+  }
+
+  async function copyPaymentLink() {
+    if (!activeQr) return;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard access is unavailable in this browser.");
+      await navigator.clipboard.writeText(activeQr.uri);
+      setNotice("UPI payment link copied.");
+      setError("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Clipboard access is unavailable in this browser.");
     }
   }
 
@@ -338,7 +368,7 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
             <div className="crm-form-grid">
               <label className="field"><span>Your custom UPI ID *</span><input required maxLength={256} autoComplete="off" value={upiId} onChange={(event) => setUpiId(event.target.value)} placeholder="businessname@bank" pattern="[A-Za-z0-9._-]{2,256}@[A-Za-z0-9.-]{2,64}" title="UPI ID format: name@bank" /></label>
               <label className="field"><span>Amount (INR) *</span><input required type="number" min="0.01" step="0.01" max="9999999999" value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="1250.00" /></label>
-              <label className="field crm-field-wide"><span>Link invoice (optional)</span><select value={invoiceId} onChange={(event) => { setInvoiceId(event.target.value); if (event.target.value) setCustomerId(""); }}><option value="">No invoice — record to customer receipt</option>{invoiceOptions.map((invoice) => <option key={invoice.id} value={invoice.id}>{String(invoice.invoiceNumber || "Invoice")} · {String(invoice.customerName || invoice.customer?.name || "Customer")} · due {INR.format(Number(invoice.balance ?? (Number(invoice.total || 0) - Number(invoice.paidAmount || 0))))}</option>)}</select></label>
+              <label className="field crm-field-wide"><span>Link invoice (optional)</span><select value={invoiceId} onChange={(event) => { setInvoiceId(event.target.value); if (event.target.value) setCustomerId(""); }}><option value="">No invoice — record to customer receipt</option>{invoiceOptions.map(({ item, balance }) => <option key={item.id} value={String(item.id)}>{String(item.invoiceNumber || "Invoice")} · {String(item.customer?.name || "Customer")} · due {INR.format(balance)}</option>)}</select></label>
               {!invoiceId && <label className="field crm-field-wide"><span>Customer *</span><select required value={customerId} onChange={(event) => setCustomerId(event.target.value)}><option value="">Choose customer</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{String(customer.name || "Customer")}{customer.company ? " · " + String(customer.company) : ""}</option>)}</select></label>}
               <label className="field"><span>Payer display name (optional)</span><input maxLength={160} value={payerName} onChange={(event) => setPayerName(event.target.value)} placeholder="Customer name" /></label>
               <label className="field"><span>Notes (optional)</span><input maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Payment purpose" /></label>
@@ -359,7 +389,7 @@ export function UpiCollectionsModule({ canDelete = false }: { canDelete?: boolea
             <div className="crm-form-actions" style={{ justifyContent: "center" }}>
               <a className="brand-button" href={activeQr.image} download={"upi-qr-" + safeFilename(activeQr.reference) + ".png"}><ArrowDownToLine size={15} />Download QR</a>
               <a className="crm-secondary-button" href={activeQr.uri}><ArrowRight size={15} />Open UPI app</a>
-              <button type="button" className="crm-secondary-button" onClick={() => { void navigator.clipboard?.writeText(activeQr.uri).then(() => setNotice("UPI payment link copied."), () => setError("Clipboard access is unavailable in this browser.")); }}><Clipboard size={14} />Copy link</button>
+              <button type="button" className="crm-secondary-button" onClick={() => void copyPaymentLink()}><Clipboard size={14} />Copy link</button>
             </div>
             <p className="owner-footnote">Share this QR with the payer. The request stays pending until you reconcile its UTR.</p>
           </div> : <div className="dashboard-empty"><span className="dashboard-empty-icon"><QrCode size={20} /></span><strong>Your QR will appear here</strong><p>Create a collection with a valid UPI ID and amount, then download or share the QR.</p></div>}
