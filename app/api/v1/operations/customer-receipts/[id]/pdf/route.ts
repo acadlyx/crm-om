@@ -15,7 +15,6 @@ const BLACK = rgb(0.13, 0.17, 0.16);
 const MUTED = rgb(0.38, 0.43, 0.41);
 const LIGHT_BORDER = rgb(0.86, 0.89, 0.87);
 const PALE = rgb(0.96, 0.975, 0.965);
-const WHITE = rgb(1, 1, 1);
 const DANGER = rgb(0.7, 0.15, 0.16);
 
 function pdfText(value: unknown): string {
