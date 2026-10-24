@@ -8,8 +8,9 @@ const blankToUndefined = (value: unknown) => value === "" || value === null ? un
 const optionalText = z.preprocess(blankToUndefined, z.string().trim().max(2000).optional());
 const optionalEmail = z.preprocess(blankToUndefined, z.string().trim().email().max(320).optional());
 const optionalDate = z.preprocess(blankToUndefined, z.coerce.date().optional());
-const optionalMoney = z.preprocess(blankToUndefined, z.coerce.number().finite().min(0).max(9999999999).optional());
-const positiveMoney = z.coerce.number().finite().positive().max(9999999999);
+const hasCents = (value: number) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7;
+const optionalMoney = z.preprocess(blankToUndefined, z.coerce.number().finite().min(0).max(9999999999).refine(hasCents, "Currency amounts may have at most two decimal places.").optional());
+const positiveMoney = z.coerce.number().finite().positive().max(9999999999).refine(hasCents, "Currency amounts may have at most two decimal places.");
 const leadStatus = z.enum(["NEW", "CONTACTED", "QUALIFIED", "CONVERTED", "LOST"]);
 const dealStage = z.enum(["QUALIFICATION", "PROPOSAL", "NEGOTIATION", "WON", "LOST"]);
 const paymentMethod = z.enum(["CASH", "BANK_TRANSFER", "CARD", "UPI", "CHEQUE", "OTHER"]);
