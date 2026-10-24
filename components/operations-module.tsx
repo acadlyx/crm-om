@@ -209,10 +209,10 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
   const teamOptions = catalogs.team.filter((item) => item.isActive).map((item) => ({ value: item.id, label: item.name + " · " + item.role.replaceAll("_", " ") }));
   const invoiceOptions = catalogs.invoices.filter((item) => {
     if (item.status === "CANCELLED") return false;
-    const paid = (item.payments || []).reduce((sum: number, p: Row) => sum + Number(p.amount || 0), 0)
+    const paid = (item.payments || []).filter((p: Row) => p.status === "POSTED").reduce((sum: number, p: Row) => sum + Number(p.amount || 0), 0)
       + (item.receiptAllocations || []).filter((a: Row) => a.receipt?.status === "POSTED").reduce((sum: number, a: Row) => sum + Number(a.amount || 0), 0);
     return Number(item.total || 0) - paid > 0.005;
-  }).map((item) => ({ value: item.id, label: (item.invoiceNumber || "Invoice") + " · " + (item.customer?.name || item.customerName || "") + " · due " + new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Math.max(0, Number(item.total || 0) - (item.payments || []).reduce((sum: number, p: Row) => sum + Number(p.amount || 0), 0) - (item.receiptAllocations || []).filter((a: Row) => a.receipt?.status === "POSTED").reduce((sum: number, a: Row) => sum + Number(a.amount || 0), 0))) }));
+  }).map((item) => ({ value: item.id, label: (item.invoiceNumber || "Invoice") + " · " + (item.customer?.name || item.customerName || "") + " · due " + new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Math.max(0, Number(item.total || 0) - (item.payments || []).filter((p: Row) => p.status === "POSTED").reduce((sum: number, p: Row) => sum + Number(p.amount || 0), 0) - (item.receiptAllocations || []).filter((a: Row) => a.receipt?.status === "POSTED").reduce((sum: number, a: Row) => sum + Number(a.amount || 0), 0))) }));
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
