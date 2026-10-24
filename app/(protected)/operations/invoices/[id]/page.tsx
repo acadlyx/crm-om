@@ -124,7 +124,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
         </section>
         <footer className="invoice-document-footer">{platform.footerText.replaceAll("{product_name}", companyName).replaceAll("{year}", String(new Date().getFullYear()))}</footer>
       </article>
-      <p className="invoice-print-hint">Use your browser's print dialog and select “Save as PDF” to export this invoice.</p>
+      <p className="invoice-print-hint">Use your browser&apos;s print dialog and select “Save as PDF” to export this invoice.</p>
     </div>
   );
 }
