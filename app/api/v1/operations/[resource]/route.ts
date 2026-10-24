@@ -155,7 +155,12 @@ async function rowsFor(resource: string, tenantId: string) {
       return db.salesOrder.findMany({ where: { tenantId }, orderBy: { createdAt: "desc" }, take: 300, include: {
         customer: { select: { id: true, name: true, company: true } },
         items: { include: { product: { select: { id: true, sku: true, name: true } } } },
-        deliveries: { select: { id: true, deliveryNumber: true, status: true } },
+        deliveries: {
+          select: {
+            id: true, deliveryNumber: true, status: true,
+            items: { select: { orderItemId: true, quantity: true } },
+          },
+        },
         invoices: { select: { id: true, invoiceNumber: true, status: true, total: true } },
       } });
     case "purchase-orders":
