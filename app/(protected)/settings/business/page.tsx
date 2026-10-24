@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function BusinessSettingsPage() {
   const session=await getServerSession(authOptions);
   if(!session?.user?.email)redirect("/login");
-  if(session.user.role!=="TENANT_ADMIN"||!session.user.tenantId)redirect("/dashboard");
+  if((session.user.role!=="TENANT_ADMIN"&&session.user.role!=="PLATFORM_ADMIN")||!session.user.tenantId)redirect("/dashboard");
   const settings=await db.businessSettings.findUnique({where:{tenantId:session.user.tenantId}});
   const initial=settings?{
     businessName:settings.businessName,logoUrl:settings.logoUrl,contactEmail:settings.contactEmail,

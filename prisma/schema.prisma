@@ -2,6 +2,7 @@ generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
 }
+
 datasource db {
   provider = "postgresql"
 }
@@ -10,6 +11,58 @@ enum UserRole {
   PLATFORM_ADMIN
   TENANT_ADMIN
   STAFF
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  CONVERTED
+  LOST
+}
+
+enum DealStage {
+  QUALIFICATION
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD
+  UPI
+  CHEQUE
+  OTHER
+}
+
+enum ExpenseStatus {
+  PLANNED
+  PAID
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }
 
 model User {
@@ -33,6 +86,13 @@ model Tenant {
   slug      String            @unique @db.VarChar(80)
   users     User[]
   settings  BusinessSettings?
+  customers Customer[]
+  leads     Lead[]
+  deals     Deal[]
+  invoices  Invoice[]
+  payments  Payment[]
+  expenses  Expense[]
+  tasks     Task[]
   createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -104,4 +164,146 @@ model SystemNotification {
   @@unique([recipientUserId, idempotencyKey])
   @@index([recipientUserId, readAt, createdAt])
   @@map("system_notifications")
+}
+
+model Customer {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String   @db.VarChar(160)
+  company   String?  @db.VarChar(160)
+  email     String?  @db.VarChar(320)
+  phone     String?  @db.VarChar(40)
+  status    String   @default("ACTIVE") @db.VarChar(20)
+  notes     String?  @db.Text
+  deals     Deal[]
+  invoices  Invoice[]
+  tasks     Task[]
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, name])
+  @@map("customers")
+}
+
+model Lead {
+  id             String     @id @default(uuid()) @db.Uuid
+  tenantId       String     @map("tenant_id") @db.Uuid
+  tenant         Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fullName       String     @map("full_name") @db.VarChar(160)
+  company        String?    @db.VarChar(160)
+  email          String?    @db.VarChar(320)
+  phone          String?    @db.VarChar(40)
+  source         String?    @db.VarChar(80)
+  status         LeadStatus @default(NEW)
+  estimatedValue Decimal    @default(0) @map("estimated_value") @db.Decimal(12, 2)
+  notes          String?    @db.Text
+  deals          Deal[]
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([tenantId, status, createdAt])
+  @@map("leads")
+}
+
+model Deal {
+  id                String    @id @default(uuid()) @db.Uuid
+  tenantId          String    @map("tenant_id") @db.Uuid
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title             String    @db.VarChar(200)
+  customerId        String?   @map("customer_id") @db.Uuid
+  customer          Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  leadId            String?   @map("lead_id") @db.Uuid
+  lead              Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  value             Decimal   @default(0) @db.Decimal(12, 2)
+  stage             DealStage @default(QUALIFICATION)
+  expectedCloseDate DateTime? @map("expected_close_date") @db.Date
+  closedAt          DateTime? @map("closed_at") @db.Timestamptz(6)
+  notes             String?   @db.Text
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([tenantId, stage, expectedCloseDate])
+  @@index([tenantId, createdAt])
+  @@map("deals")
+}
+
+model Invoice {
+  id            String        @id @default(uuid()) @db.Uuid
+  tenantId      String        @map("tenant_id") @db.Uuid
+  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId    String        @map("customer_id") @db.Uuid
+  customer      Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  invoiceNumber String        @map("invoice_number") @db.VarChar(40)
+  issueDate     DateTime      @default(now()) @map("issue_date") @db.Date
+  dueDate       DateTime      @map("due_date") @db.Date
+  subtotal      Decimal       @db.Decimal(12, 2)
+  taxAmount     Decimal       @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  total         Decimal       @db.Decimal(12, 2)
+  status        InvoiceStatus @default(DRAFT)
+  notes         String?       @db.Text
+  payments      Payment[]
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId, status, dueDate])
+  @@index([tenantId, customerId, issueDate])
+  @@map("invoices")
+}
+
+model Payment {
+  id        String        @id @default(uuid()) @db.Uuid
+  tenantId  String        @map("tenant_id") @db.Uuid
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoiceId String        @map("invoice_id") @db.Uuid
+  invoice   Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  amount    Decimal       @db.Decimal(12, 2)
+  method    PaymentMethod @default(OTHER)
+  reference String?       @db.VarChar(160)
+  paidAt    DateTime      @default(now()) @map("paid_at") @db.Timestamptz(6)
+  notes     String?       @db.Text
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([tenantId, paidAt])
+  @@index([tenantId, invoiceId])
+  @@map("payments")
+}
+
+model Expense {
+  id        String        @id @default(uuid()) @db.Uuid
+  tenantId  String        @map("tenant_id") @db.Uuid
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title     String        @db.VarChar(200)
+  category  String        @default("General") @db.VarChar(100)
+  amount    Decimal       @db.Decimal(12, 2)
+  spentAt   DateTime      @default(now()) @map("spent_at") @db.Date
+  vendor    String?       @db.VarChar(160)
+  method    PaymentMethod @default(OTHER)
+  status    ExpenseStatus @default(PAID)
+  notes     String?       @db.Text
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([tenantId, status, spentAt])
+  @@map("expenses")
+}
+
+model Task {
+  id          String       @id @default(uuid()) @db.Uuid
+  tenantId    String       @map("tenant_id") @db.Uuid
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  title       String       @db.VarChar(200)
+  description String?      @db.Text
+  dueDate     DateTime?    @map("due_date") @db.Timestamptz(6)
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(TODO)
+  customerId  String?      @map("customer_id") @db.Uuid
+  customer    Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([tenantId, status, dueDate])
+  @@map("tasks")
 }

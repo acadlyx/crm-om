@@ -10,10 +10,15 @@ import {
   CheckCircle2,
   CircleDashed,
   Clock3,
+  FileText,
+  FileWarning,
+  HandCoins,
   Palette,
   ShieldCheck,
   Sparkles,
+  TrendingUp,
   Users,
+  Wallet,
 } from "lucide-react";
 import { authOptions } from "@/lib/auth";
 import { getPlatformBranding } from "@/lib/branding/service";
@@ -32,13 +37,17 @@ function formatTimestamp(value: Date) {
   }).format(value);
 }
 
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(value);
+}
+
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id || !session.user.email) redirect("/login");
 
   const isPlatformAdmin = session.user.role === "PLATFORM_ADMIN";
   const tenantId = session.user.tenantId;
-  const activityWhere = isPlatformAdmin ? {} : { actorUserId: session.user.id };
+  const activityWhere = isPlatformAdmin && !tenantId ? {} : { actorUserId: session.user.id };
 
   const [
     brand,
@@ -81,6 +90,42 @@ export default async function DashboardPage() {
       : Promise.resolve(null),
   ]);
 
+  let collectedThisMonth = 0;
+  let paidExpensesThisMonth = 0;
+  let outstandingBalance = 0;
+  let overdueInvoiceCount = 0;
+  let openPipelineValue = 0;
+  let openDealCount = 0;
+  let openTaskCount = 0;
+
+  if (tenantId) {
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const [paymentAggregate, expenseAggregate, invoices, pipeline, tasks] = await Promise.all([
+      db.payment.aggregate({ where: { tenantId, paidAt: { gte: monthStart } }, _sum: { amount: true } }),
+      db.expense.aggregate({ where: { tenantId, status: "PAID", spentAt: { gte: monthStart } }, _sum: { amount: true } }),
+      db.invoice.findMany({
+        where: { tenantId, status: { not: "CANCELLED" } },
+        select: { total: true, dueDate: true, payments: { select: { amount: true } } },
+      }),
+      db.deal.aggregate({ where: { tenantId, stage: { notIn: ["WON", "LOST"] } }, _sum: { value: true }, _count: { _all: true } }),
+      db.task.count({ where: { tenantId, status: { not: "DONE" } } }),
+    ]);
+    collectedThisMonth = Number(paymentAggregate._sum.amount || 0);
+    paidExpensesThisMonth = Number(expenseAggregate._sum.amount || 0);
+    const now = new Date();
+    for (const invoice of invoices) {
+      const paid = invoice.payments.reduce((sum, item) => sum + Number(item.amount), 0);
+      const balance = Math.max(0, Number(invoice.total) - paid);
+      outstandingBalance += balance;
+      if (balance > 0 && invoice.dueDate < now) overdueInvoiceCount += 1;
+    }
+    openPipelineValue = Number(pipeline._sum.value || 0);
+    openDealCount = pipeline._count._all;
+    openTaskCount = tasks;
+  }
+
   const firstName = session.user.name?.trim().split(/\s+/)[0] || session.user.email.split("@")[0] || "there";
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -88,26 +133,36 @@ export default async function DashboardPage() {
     ? "Platform administrator"
     : session.user.role === "TENANT_ADMIN" ? "Business administrator" : "Team member";
 
-  const metrics = isPlatformAdmin
+  const metrics = isPlatformAdmin && !tenantId
     ? [
         { label: "Business workspaces", value: workspaceCount, note: "Customer organizations", icon: Building2, tone: "blue" },
         { label: "User accounts", value: userCount, note: "Across the platform", icon: Users, tone: "violet" },
         { label: "Activity events", value: activityCount, note: "Recorded audit events", icon: Activity, tone: "amber" },
         { label: "Unread notifications", value: unreadCount, note: "In your inbox", icon: Bell, tone: "green" },
       ]
-    : [
-        { label: "Workspace access", value: tenantId ? "Connected" : "Personal", note: tenantId ? "Your assigned business" : "No business workspace assigned", icon: Building2, tone: "blue" },
-        { label: "Team members", value: userCount, note: tenantId ? "In your workspace" : "Your account", icon: Users, tone: "violet" },
+    : tenantId ? [
+        { label: "Collected this month", value: formatCurrency(collectedThisMonth), note: "Payments recorded against invoices", icon: HandCoins, tone: "green" },
+        { label: "Outstanding receivables", value: formatCurrency(outstandingBalance), note: overdueInvoiceCount + " overdue invoices", icon: FileWarning, tone: "violet" },
+        { label: "Expenses this month", value: formatCurrency(paidExpensesThisMonth), note: "Expenses marked as paid", icon: Wallet, tone: "amber" },
+        { label: "Open sales pipeline", value: formatCurrency(openPipelineValue), note: openDealCount + " active deals · " + openTaskCount + " open tasks", icon: TrendingUp, tone: "blue" },
+      ] : [
+        { label: "Workspace access", value: "Personal", note: "No business workspace assigned", icon: Building2, tone: "blue" },
+        { label: "Your account", value: userCount, note: "User account", icon: Users, tone: "violet" },
         { label: "Your activity", value: activityCount, note: "Recorded actions", icon: Activity, tone: "amber" },
         { label: "Unread notifications", value: unreadCount, note: "In your inbox", icon: Bell, tone: "green" },
       ];
 
   const quickActions = [
-    ...(isPlatformAdmin
-      ? [{ title: "Platform branding", description: "Update name, logo and support details", href: "/platform-settings/branding", icon: Palette }]
-      : session.user.role === "TENANT_ADMIN" && tenantId
-        ? [{ title: "Business identity", description: "Manage business and invoice details", href: "/settings/business", icon: Building2 }]
-        : []),
+    ...(isPlatformAdmin ? [
+      { title: "Business workspaces", description: workspaceCount + " business workspace(s) · manage owner access", href: "/platform-settings/workspaces", icon: Building2 },
+      { title: "Platform branding", description: "Update product name, logo and support details", href: "/platform-settings/branding", icon: Palette },
+    ] : []),
+    ...(tenantId ? [
+      { title: "Customers & contacts", description: "Manage your customer directory", href: "/crm/customers", icon: Users },
+      { title: "Create an invoice", description: "Bill a customer and track the balance", href: "/crm/invoices", icon: FileText },
+      { title: "Record a payment", description: "Log receipts and update invoice balances", href: "/crm/payments", icon: HandCoins },
+      { title: "Expenses & reports", description: "Track business costs and cash flow", href: "/crm/expenses", icon: Wallet },
+    ] : []),
     { title: "Notifications", description: notificationCount
         ? notificationCount + " notification" + (notificationCount === 1 ? "" : "s") + " in your inbox"
         : "View system updates and alerts", href: "/notifications", icon: Bell },
@@ -141,11 +196,11 @@ export default async function DashboardPage() {
       <div className="dashboard-content-grid">
         <section className="card dashboard-panel">
           <div className="dashboard-panel-heading">
-            <div><p className="dashboard-eyebrow">AT A GLANCE</p><h2>{isPlatformAdmin ? "Platform overview" : "Your workspace"}</h2></div>
+            <div><p className="dashboard-eyebrow">AT A GLANCE</p><h2>{isPlatformAdmin && !tenantId ? "Platform overview" : "Your workspace"}</h2></div>
             <span className="dashboard-live"><span />Live data</span>
           </div>
 
-          {isPlatformAdmin ? (
+          {isPlatformAdmin && !tenantId ? (
             <div className="dashboard-overview-callout">
               <div className="dashboard-callout-icon"><Sparkles size={22} aria-hidden="true" /></div>
               <div>
