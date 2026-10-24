@@ -320,7 +320,7 @@ export function OperationsModule({ resource, owner, canUpdate = false }: { resou
       setSelectedOrderId("");
       await loadRows();
       await loadCatalogs();
-      if (resource === "products") setNotice((result.idempotentReplay ? "" : "Product saved. ") + "Opening stock, if supplied, was added to the stock ledger.");
+      if (resource === "products" && !editingMasterRecord) setNotice((result.idempotentReplay ? "" : "Product saved. ") + "Opening stock, if supplied, was added to the stock ledger.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not save this record.");
     } finally {
@@ -713,8 +713,8 @@ function Cell({ row, column }: { row: Row; column: Column }) {
   return <span>{showValue(value, column.key)}</span>;
 }
 
-function RowActions({ resource, row, owner, onChange, onUpdate, onInvoice, onEdit }: {
-  resource: string; row: Row; owner: boolean; onChange: (row: Row, status: string) => void;
+function RowActions({ resource, row, owner, canUpdate, onChange, onUpdate, onInvoice, onEdit }: {
+  resource: string; row: Row; owner: boolean; canUpdate: boolean; onChange: (row: Row, status: string) => void;
   onUpdate: (row: Row, body: Record<string, unknown>, confirmation?: string) => void;
   onInvoice: (row: Row) => void;
   onEdit: (row: Row) => void;
@@ -744,8 +744,14 @@ function RowActions({ resource, row, owner, onChange, onUpdate, onInvoice, onEdi
     <button type="button" className="crm-secondary-button" onClick={()=>onUpdate(row,{status:"COMPLETED"})}>Complete</button>
     <button type="button" className="crm-secondary-button is-danger" onClick={()=>onUpdate(row,{status:"CANCELLED"})}>Cancel</button>
   </div>;
-  if (resource === "products" && owner && row.status !== "INACTIVE") return <button type="button" className="crm-secondary-button is-danger" onClick={()=>onUpdate(row,{status:"INACTIVE"},"Deactivate this product? Existing stock and transaction history will be preserved.")}>Deactivate</button>;
-  if (resource === "suppliers" && owner && row.status !== "INACTIVE") return <button type="button" className="crm-secondary-button is-danger" onClick={()=>onUpdate(row,{status:"INACTIVE"},"Deactivate this supplier? Existing purchase and payment history will be preserved.")}>Deactivate</button>;
+  if (resource === "products") return <div className="operations-row-actions">
+    {canUpdate && <button type="button" className="crm-secondary-button" onClick={() => onEdit(row)}>Edit</button>}
+    {owner && row.status !== "INACTIVE" && <button type="button" className="crm-secondary-button is-danger" onClick={() => onUpdate(row,{status:"INACTIVE"},"Deactivate this product? Existing stock and transaction history will be preserved.")}>Deactivate</button>}
+  </div>;
+  if (resource === "suppliers") return <div className="operations-row-actions">
+    {canUpdate && <button type="button" className="crm-secondary-button" onClick={() => onEdit(row)}>Edit</button>}
+    {owner && row.status !== "INACTIVE" && <button type="button" className="crm-secondary-button is-danger" onClick={() => onUpdate(row,{status:"INACTIVE"},"Deactivate this supplier? Existing purchase and payment history will be preserved.")}>Deactivate</button>}
+  </div>;
   if (resource === "permissions" && owner) return <button type="button" className="crm-secondary-button" onClick={()=>onUpdate(row,{granted:!row.granted})}>{row.granted?"Deny":"Allow"}</button>;
   return <span className="muted">—</span>;
 }
