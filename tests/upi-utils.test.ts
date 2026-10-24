@@ -48,7 +48,7 @@ describe("parseStatementCsv", () => {
 
   it("matches common bank statement header variants", () => {
     const headers = ["Transaction Remarks", "UPI Ref No.", "Credit"];
-    expect(findStatementColumn(headers, ["transactionref", "remarks"])).toBe(0);
+    expect(findStatementColumn(headers, ["transactionref", "transactionremarks", "remarks"])).toBe(0);
     expect(findStatementColumn(headers, ["utr", "upirefno", "rrn"])).toBe(1);
     expect(findStatementColumn(headers, ["amount", "credit"])).toBe(2);
   });
