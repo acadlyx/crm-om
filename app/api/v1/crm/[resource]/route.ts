@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requireWorkspaceAccess, writeAuditEvent } from "@/lib/crm/access";
+import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { db } from "@/lib/db";
 
 const blankToUndefined = (value: unknown) => value === "" || value === null ? undefined : value;
@@ -125,6 +126,8 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
     return Response.json({ error: { message: access.message } }, { status: access.status });
   }
   const { resource } = await context.params;
+  const permission = await requireWorkspacePermission(access, resource, "read");
+  if (!permission.ok) return Response.json({ error: { message: permission.message } }, { status: permission.status });
   try {
     const rows = await getRows(resource, access.tenantId);
     if (!rows) return Response.json({ error: { message: "Unknown CRM module." } }, { status: 404 });
@@ -142,6 +145,8 @@ export async function POST(request: Request, context: { params: Promise<{ resour
     return Response.json({ error: { message: access.message } }, { status: access.status });
   }
   const { resource } = await context.params;
+  const permission = await requireWorkspacePermission(access, resource, "create");
+  if (!permission.ok) return Response.json({ error: { message: permission.message } }, { status: permission.status });
   const validator = validators[resource as keyof typeof validators];
   if (!validator) return Response.json({ error: { message: "Unknown CRM module." } }, { status: 404 });
 
