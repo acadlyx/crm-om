@@ -74,7 +74,8 @@ export function AppSidebar({ branding, role, tenantId }: { branding: Branding; r
 
           {isOwner && <>
             <p className="sidebar-section-label">OWNER CONTROLS</p>
-            <Link className="sidebar-link" href="/operations/permissions"><ShieldCheck size={17} aria-hidden="true" />Team & permissions</Link>
+            <Link className="sidebar-link" href="/operations/team"><Users size={17} aria-hidden="true" />Team management</Link>
+            <Link className="sidebar-link" href="/operations/permissions"><ShieldCheck size={17} aria-hidden="true" />Permissions</Link>
             <Link className="sidebar-link" href="/settings/business"><Building2 size={17} aria-hidden="true" />Business settings</Link>
           </>}
         </>}
@@ -82,7 +83,6 @@ export function AppSidebar({ branding, role, tenantId }: { branding: Branding; r
         <p className="sidebar-section-label">ACCOUNT</p>
         <Link className="sidebar-link" href="/notifications"><Bell size={17} aria-hidden="true" />Notifications & activity</Link>
         {isPlatformAdmin && <Link className="sidebar-link" href="/platform-settings/branding"><Palette size={17} aria-hidden="true" />Platform branding</Link>}
-        {isPlatformAdmin && !tenantId && <Link className="sidebar-link" href="/platform-settings/workspaces"><Building2 size={17} aria-hidden="true" />Business workspaces</Link>}
       </nav>
       <LogoutButton />
     </aside>
