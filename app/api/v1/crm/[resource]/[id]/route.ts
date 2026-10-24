@@ -1,11 +1,16 @@
 import { z } from "zod";
+import { Prisma } from "@/generated/prisma/client";
+import { invoiceStatusFromBalance } from "@/lib/operations/finance";
 import { requireWorkspaceAccess, writeAuditEvent } from "@/lib/crm/access";
+import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { db } from "@/lib/db";
 
 export async function PATCH(request: Request, context: { params: Promise<{ resource: string; id: string }> }) {
   const access = await requireWorkspaceAccess();
   if (!access.ok) return Response.json({ error: { message: access.message } }, { status: access.status });
   const { resource, id } = await context.params;
+  const permission = await requireWorkspacePermission(access, resource, "update");
+  if (!permission.ok) return Response.json({ error: { message: permission.message } }, { status: permission.status });
   if (!z.string().uuid().safeParse(id).success) {
     return Response.json({ error: { message: "Invalid record identifier." } }, { status: 400 });
   }
@@ -14,6 +19,72 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
 
   try {
     let updated: { count: number } | null = null;
+    if (resource === "payments") {
+      if (access.user.role !== "TENANT_ADMIN" && access.user.role !== "PLATFORM_ADMIN") {
+        return Response.json({ error: { message: "Only the business owner can reverse a posted payment." } }, { status: 403 });
+      }
+      const parsed = z.object({ status: z.literal("REVERSED"), reason: z.string().trim().min(3).max(1000) }).strict().safeParse(body);
+      if (!parsed.success) return Response.json({ error: { message: "A reversal reason of at least 3 characters is required." } }, { status: 400 });
+      const result = await db.$transaction(async (tx) => {
+        const payment = await tx.payment.findFirst({
+          where: { id, tenantId: access.tenantId },
+          include: {
+            invoice: {
+              select: {
+                id: true, customerId: true, total: true, dueDate: true, status: true,
+                payments: { select: { id: true, amount: true, status: true } },
+                receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } },
+              },
+            },
+          },
+        });
+        if (!payment) return { kind: "NOT_FOUND" as const };
+        if (payment.status === "REVERSED") return { kind: "ALREADY_REVERSED" as const };
+        if (payment.status !== "POSTED") return { kind: "NOT_POSTED" as const };
+
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: "REVERSED", notes: [payment.notes, "Reversal: " + parsed.data.reason].filter(Boolean).join("\n") },
+        });
+
+        const legacyPaid = payment.invoice.payments
+          .filter((entry) => entry.status === "POSTED" && entry.id !== payment.id)
+          .reduce((sum, entry) => sum + Number(entry.amount), 0);
+        const allocatedPaid = payment.invoice.receiptAllocations
+          .filter((entry) => entry.receipt.status === "POSTED")
+          .reduce((sum, entry) => sum + Number(entry.amount), 0);
+        const paidAfter = legacyPaid + allocatedPaid;
+        const nextStatus = invoiceStatusFromBalance({
+          total: payment.invoice.total,
+          paid: paidAfter,
+          dueDate: payment.invoice.dueDate,
+          wasDraft: payment.invoice.status === "DRAFT",
+        });
+        await tx.invoice.update({ where: { id: payment.invoiceId }, data: { status: nextStatus } });
+        await tx.ledgerEntry.create({
+          data: {
+            tenantId: access.tenantId, customerId: payment.invoice.customerId,
+            entryType: "CUSTOMER_PAYMENT_REVERSAL", referenceType: "PAYMENT", referenceId: payment.id,
+            description: "Reversal of payment against invoice " + payment.invoiceId,
+            debit: payment.amount, credit: 0, idempotencyKey: "payment-reversal-" + payment.id,
+            createdByUserId: access.user.id,
+          },
+        });
+        await tx.auditLog.create({
+          data: {
+            actorUserId: access.user.id, action: "CUSTOMER_PAYMENT_REVERSED",
+            entityType: "Payment", entityId: payment.id,
+            metadata: { invoiceId: payment.invoiceId, amount: Number(payment.amount), reason: parsed.data.reason },
+          },
+        });
+        return { kind: "REVERSED" as const };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      if (result.kind === "NOT_FOUND") return Response.json({ error: { message: "Payment not found in this workspace." } }, { status: 404 });
+      if (result.kind === "ALREADY_REVERSED") return Response.json({ error: { message: "This payment was already reversed." } }, { status: 409 });
+      if (result.kind === "NOT_POSTED") return Response.json({ error: { message: "Only a posted payment can be reversed." } }, { status: 409 });
+      return Response.json({ data: { id, status: "REVERSED" } });
+    }
+
     if (resource === "leads" && body.status === "CONVERTED") {
       const conversion = await db.$transaction(async (tx) => {
         const lead = await tx.lead.findFirst({
@@ -51,9 +122,30 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
     }
 
     if (resource === "customers") {
-      const parsed = z.object({ status: z.enum(["ACTIVE", "INACTIVE"]) }).safeParse(body);
-      if (!parsed.success) return Response.json({ error: { message: "Choose a valid customer status." } }, { status: 400 });
-      updated = await db.customer.updateMany({ where: { id, tenantId: access.tenantId }, data: { status: parsed.data.status } });
+      const parsed = z.object({
+        name: z.string().trim().min(1).max(160).optional(),
+        company: z.preprocess((value) => value === "" || value === null ? undefined : value, z.string().trim().max(200).optional()),
+        email: z.preprocess((value) => value === "" || value === null ? undefined : value, z.string().trim().email().max(320).optional()),
+        phone: z.preprocess((value) => value === "" || value === null ? undefined : value, z.string().trim().max(40).optional()),
+        address: z.preprocess((value) => value === "" || value === null ? undefined : value, z.string().trim().max(1000).optional()),
+        creditLimit: z.coerce.number().finite().min(0).max(9999999999).refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7, "Credit limits may have at most two decimal places.").optional(),
+        paymentTermsDays: z.coerce.number().int().min(0).max(365).optional(),
+        notes: z.preprocess((value) => value === "" || value === null ? undefined : value, z.string().trim().max(2000).optional()),
+        status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
+      }).strict().safeParse(body);
+      if (!parsed.success) return Response.json({ error: { message: parsed.error.issues[0]?.message || "Check customer details." } }, { status: 400 });
+      const patch: Record<string, unknown> = {};
+      if ("name" in body) patch.name = parsed.data.name;
+      if ("company" in body) patch.company = parsed.data.company ?? null;
+      if ("email" in body) patch.email = parsed.data.email?.toLowerCase() ?? null;
+      if ("phone" in body) patch.phone = parsed.data.phone ?? null;
+      if ("address" in body) patch.addresses = parsed.data.address ? [parsed.data.address] : [];
+      if ("creditLimit" in body) patch.creditLimit = parsed.data.creditLimit ?? 0;
+      if ("paymentTermsDays" in body) patch.paymentTermsDays = parsed.data.paymentTermsDays ?? 0;
+      if ("notes" in body) patch.notes = parsed.data.notes ?? null;
+      if ("status" in body) patch.status = parsed.data.status;
+      if (Object.keys(patch).length === 0) return Response.json({ error: { message: "Supply at least one editable customer field." } }, { status: 400 });
+      updated = await db.customer.updateMany({ where: { id, tenantId: access.tenantId }, data: patch as never });
     } else if (resource === "leads") {
       const parsed = z.object({ status: z.enum(["NEW", "CONTACTED", "QUALIFIED", "CONVERTED", "LOST"]) }).safeParse(body);
       if (!parsed.success) return Response.json({ error: { message: "Choose a valid lead status." } }, { status: 400 });
@@ -80,9 +172,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
     if (!updated?.count) return Response.json({ error: { message: "Record not found in this workspace." } }, { status: 404 });
     await writeAuditEvent({
       actorUserId: access.user.id,
-      action: "UPDATE_STATUS",
+      action: resource === "customers" && !("status" in body) ? "UPDATE_PROFILE" : "UPDATE_STATUS",
       entityType: resource.slice(0, -1).toUpperCase(),
       entityId: id,
+      metadata: resource === "customers" ? { fields: Object.keys(body).sort() } : undefined,
     });
     return Response.json({ data: { id, updated: true } });
   } catch (error) {

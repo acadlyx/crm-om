@@ -11,10 +11,10 @@ export async function requireWorkspaceAccess() {
 
   const user = await db.user.findUnique({
     where: { email: session.user.email },
-    select: { id: true, name: true, email: true, role: true, tenantId: true },
+    select: { id: true, name: true, email: true, role: true, tenantId: true, isActive: true },
   });
 
-  if (!user || (user.role !== "TENANT_ADMIN" && user.role !== "STAFF" && !(user.role === "PLATFORM_ADMIN" && user.tenantId)) || !user.tenantId) {
+  if (!user || !user.isActive || (user.role !== "TENANT_ADMIN" && user.role !== "STAFF" && user.role !== "SALES" && user.role !== "DELIVERY" && user.role !== "COLLECTIONS" && user.role !== "INVENTORY_MANAGER" && user.role !== "ACCOUNTANT" && !(user.role === "PLATFORM_ADMIN" && user.tenantId)) || !user.tenantId) {
     return {
       ok: false as const,
       status: 403,

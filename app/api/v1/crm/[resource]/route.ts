@@ -1,13 +1,16 @@
 import { z } from "zod";
+import { Prisma } from "@/generated/prisma/client";
 import { requireWorkspaceAccess, writeAuditEvent } from "@/lib/crm/access";
+import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { db } from "@/lib/db";
 
 const blankToUndefined = (value: unknown) => value === "" || value === null ? undefined : value;
 const optionalText = z.preprocess(blankToUndefined, z.string().trim().max(2000).optional());
 const optionalEmail = z.preprocess(blankToUndefined, z.string().trim().email().max(320).optional());
 const optionalDate = z.preprocess(blankToUndefined, z.coerce.date().optional());
-const optionalMoney = z.preprocess(blankToUndefined, z.coerce.number().finite().min(0).max(9999999999).optional());
-const positiveMoney = z.coerce.number().finite().positive().max(9999999999);
+const hasCents = (value: number) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-7;
+const optionalMoney = z.preprocess(blankToUndefined, z.coerce.number().finite().min(0).max(9999999999).refine(hasCents, "Currency amounts may have at most two decimal places.").optional());
+const positiveMoney = z.coerce.number().finite().positive().max(9999999999).refine(hasCents, "Currency amounts may have at most two decimal places.");
 const leadStatus = z.enum(["NEW", "CONTACTED", "QUALIFIED", "CONVERTED", "LOST"]);
 const dealStage = z.enum(["QUALIFICATION", "PROPOSAL", "NEGOTIATION", "WON", "LOST"]);
 const paymentMethod = z.enum(["CASH", "BANK_TRANSFER", "CARD", "UPI", "CHEQUE", "OTHER"]);
@@ -18,6 +21,9 @@ const validators = {
     company: optionalText,
     email: optionalEmail,
     phone: optionalText,
+    address: optionalText,
+    creditLimit: optionalMoney,
+    paymentTermsDays: z.preprocess(blankToUndefined, z.coerce.number().int().min(0).max(365).optional()),
     notes: optionalText,
   }),
   leads: z.object({
@@ -46,6 +52,7 @@ const validators = {
     subtotal: positiveMoney,
     taxAmount: optionalMoney,
     notes: optionalText,
+    idempotencyKey: z.string().trim().min(8).max(160),
   }),
   payments: z.object({
     invoiceId: z.string().uuid(),
@@ -54,6 +61,7 @@ const validators = {
     reference: optionalText,
     paidAt: optionalDate,
     notes: optionalText,
+    idempotencyKey: z.string().trim().min(8).max(160),
   }),
   expenses: z.object({
     title: z.string().trim().min(1).max(200),
@@ -100,7 +108,7 @@ async function getRows(resource: string, tenantId: string) {
     case "invoices":
       return db.invoice.findMany({
         where: { tenantId }, orderBy: { createdAt: "desc" }, take: 100,
-        include: { customer: { select: { id: true, name: true, company: true } }, payments: { select: { amount: true } } },
+        include: { customer: { select: { id: true, name: true, company: true } }, payments: { select: { amount: true, status: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } },
       });
     case "payments":
       return db.payment.findMany({
@@ -125,6 +133,8 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
     return Response.json({ error: { message: access.message } }, { status: access.status });
   }
   const { resource } = await context.params;
+  const permission = await requireWorkspacePermission(access, resource, "read");
+  if (!permission.ok) return Response.json({ error: { message: permission.message } }, { status: permission.status });
   try {
     const rows = await getRows(resource, access.tenantId);
     if (!rows) return Response.json({ error: { message: "Unknown CRM module." } }, { status: 404 });
@@ -142,6 +152,8 @@ export async function POST(request: Request, context: { params: Promise<{ resour
     return Response.json({ error: { message: access.message } }, { status: access.status });
   }
   const { resource } = await context.params;
+  const permission = await requireWorkspacePermission(access, resource, "create");
+  if (!permission.ok) return Response.json({ error: { message: permission.message } }, { status: permission.status });
   const validator = validators[resource as keyof typeof validators];
   if (!validator) return Response.json({ error: { message: "Unknown CRM module." } }, { status: 404 });
 
@@ -157,10 +169,19 @@ export async function POST(request: Request, context: { params: Promise<{ resour
 
   try {
     let created: { id: string } | null = null;
+    let auditRecorded = false;
+    let idempotentReplay = false;
     switch (resource) {
       case "customers":
         created = await db.customer.create({
-          data: { tenantId, name: data.name, company: data.company ?? null, email: data.email?.toLowerCase() ?? null, phone: data.phone ?? null, notes: data.notes ?? null },
+          data: {
+            tenantId, name: data.name, company: data.company ?? null,
+            email: data.email?.toLowerCase() ?? null, phone: data.phone ?? null,
+            addresses: data.address ? [data.address] : [],
+            creditLimit: data.creditLimit ?? 0,
+            paymentTermsDays: data.paymentTermsDays ?? 0,
+            notes: data.notes ?? null,
+          },
           select: { id: true },
         });
         break;
@@ -186,33 +207,64 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         break;
       }
       case "invoices": {
-        const customer = await db.customer.findFirst({ where: { id: data.customerId, tenantId }, select: { id: true } });
-        if (!customer) return Response.json({ error: { message: "Select a customer from your own workspace." } }, { status: 400 });
         const issueDate = data.issueDate ?? new Date();
-        const dueDate = data.dueDate ?? new Date(issueDate.getTime() + 14 * 24 * 60 * 60 * 1000);
+        const settings = await db.businessSettings.findUnique({
+          where: { tenantId }, select: { invoicePrefix: true, defaultPaymentTermsDays: true },
+        });
+        const paymentTermsDays = settings?.defaultPaymentTermsDays ?? 0;
+        const dueDate = data.dueDate ?? new Date(issueDate.getTime() + paymentTermsDays * 24 * 60 * 60 * 1000);
         const subtotal = Number(data.subtotal);
         const taxAmount = Number(data.taxAmount ?? 0);
         const total = Math.round((subtotal + taxAmount + Number.EPSILON) * 100) / 100;
-        const invoiceNumber = "INV-" + issueDate.toISOString().slice(0, 10).replace(/-/g, "") + "-" + crypto.randomUUID().slice(0, 6).toUpperCase();
-        created = await db.invoice.create({
-          data: { tenantId, customerId: data.customerId, invoiceNumber, issueDate, dueDate, subtotal, taxAmount, total, status: "SENT", notes: data.notes ?? null },
-          select: { id: true },
-        });
+        const prefix = settings?.invoicePrefix?.trim() || "INV";
+        const invoiceNumber = prefix + "-" + issueDate.toISOString().slice(0, 10).replace(/-/g, "") + "-" + crypto.randomUUID().slice(0, 6).toUpperCase();
+        const result = await db.$transaction(async (tx) => {
+          const existing = await tx.invoice.findUnique({
+            where: { tenantId_idempotencyKey: { tenantId, idempotencyKey: data.idempotencyKey } },
+            select: { id: true },
+          });
+          if (existing) return { invoice: existing, replay: true as const };
+          const customer = await tx.customer.findFirst({ where: { id: data.customerId, tenantId }, select: { id: true } });
+          if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
+          const invoice = await tx.invoice.create({
+            data: { tenantId, customerId: data.customerId, invoiceNumber, issueDate, dueDate, subtotal, taxAmount, total, status: "SENT", notes: data.notes ?? null, idempotencyKey: data.idempotencyKey },
+            select: { id: true },
+          });
+          await tx.ledgerEntry.create({ data: {
+            tenantId, customerId: customer.id, entryType: "SALES_INVOICE", referenceType: "INVOICE", referenceId: invoice.id,
+            description: "Sales invoice " + invoiceNumber, debit: total, credit: 0, idempotencyKey: "invoice-" + invoice.id, createdByUserId: access.user.id,
+          } });
+          await tx.auditLog.create({ data: { actorUserId: access.user.id, action: "CREATE", entityType: "INVOICE", entityId: invoice.id, metadata: { invoiceNumber, total } } });
+          return { invoice, replay: false as const };
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        created = result.invoice;
+        idempotentReplay = result.replay;
+        auditRecorded = true;
         break;
       }
       case "payments": {
-        created = await db.$transaction(async (tx) => {
+        const result = await db.$transaction(async (tx) => {
+          const existing = await tx.payment.findUnique({
+            where: { tenantId_idempotencyKey: { tenantId, idempotencyKey: data.idempotencyKey } },
+            select: { id: true },
+          });
+          if (existing) return { payment: existing, replay: true as const };
           const invoice = await tx.invoice.findFirst({
             where: { id: data.invoiceId, tenantId, status: { not: "CANCELLED" } },
-            include: { payments: { select: { amount: true } } },
+            include: {
+              payments: { select: { amount: true, status: true } },
+              receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } },
+            },
           });
           if (!invoice) throw new Error("INVOICE_NOT_FOUND");
-          const received = invoice.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+          const legacyReceived = invoice.payments.filter((payment) => payment.status === "POSTED").reduce((sum, payment) => sum + Number(payment.amount), 0);
+          const allocatedReceived = invoice.receiptAllocations.filter((allocation) => allocation.receipt.status === "POSTED").reduce((sum, allocation) => sum + Number(allocation.amount), 0);
+          const received = legacyReceived + allocatedReceived;
           const balance = Math.max(0, Number(invoice.total) - received);
           const amount = Number(data.amount);
           if (amount > balance + 0.005) throw new Error("PAYMENT_EXCEEDS_BALANCE");
           const payment = await tx.payment.create({
-            data: { tenantId, invoiceId: invoice.id, amount, method: data.method, reference: data.reference ?? null, paidAt: data.paidAt ?? new Date(), notes: data.notes ?? null },
+            data: { tenantId, invoiceId: invoice.id, amount, method: data.method, reference: data.reference ?? null, paidAt: data.paidAt ?? new Date(), notes: data.notes ?? null, status: "POSTED", idempotencyKey: data.idempotencyKey },
             select: { id: true },
           });
           const paidAfter = received + amount;
@@ -220,16 +272,31 @@ export async function POST(request: Request, context: { params: Promise<{ resour
             where: { id: invoice.id },
             data: { status: paidAfter + 0.005 >= Number(invoice.total) ? "PAID" : "PARTIALLY_PAID" },
           });
-          return payment;
-        });
+          await tx.ledgerEntry.create({ data: {
+            tenantId, customerId: invoice.customerId, entryType: "CUSTOMER_PAYMENT",
+            referenceType: "PAYMENT", referenceId: payment.id, description: "Payment against invoice " + invoice.invoiceNumber,
+            debit: 0, credit: amount, idempotencyKey: "payment-" + payment.id, createdByUserId: access.user.id,
+          } });
+          await tx.auditLog.create({ data: { actorUserId: access.user.id, action: "CUSTOMER_PAYMENT_POSTED", entityType: "Payment", entityId: payment.id, metadata: { invoiceId: invoice.id, amount } } });
+          return { payment, replay: false as const };
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        created = result.payment;
+        idempotentReplay = result.replay;
+        auditRecorded = true;
         break;
       }
-      case "expenses":
-        created = await db.expense.create({
-          data: { tenantId, title: data.title, category: data.category || "General", amount: data.amount, spentAt: data.spentAt ?? new Date(), vendor: data.vendor ?? null, method: data.method ?? "OTHER", status: data.status ?? "PAID", notes: data.notes ?? null },
-          select: { id: true },
+      case "expenses": {
+        created = await db.$transaction(async (tx) => {
+          const expense = await tx.expense.create({
+            data: { tenantId, title: data.title, category: data.category || "General", amount: data.amount, spentAt: data.spentAt ?? new Date(), vendor: data.vendor ?? null, method: data.method ?? "OTHER", status: data.status ?? "PAID", notes: data.notes ?? null },
+            select: { id: true },
+          });
+          await tx.auditLog.create({ data: { actorUserId: access.user.id, action: "CREATE", entityType: "EXPENSE", entityId: expense.id, metadata: { amount: data.amount, category: data.category || "General" } } });
+          return expense;
         });
+        auditRecorded = true;
         break;
+      }
       case "tasks": {
         if (data.customerId) {
           const customer = await db.customer.findFirst({ where: { id: data.customerId, tenantId }, select: { id: true } });
@@ -243,7 +310,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
       }
     }
 
-    if (created) {
+    if (created && !auditRecorded) {
       await writeAuditEvent({
         actorUserId: access.user.id,
         action: "CREATE",
@@ -251,14 +318,21 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         entityId: created.id,
       });
     }
-    return Response.json({ data: { id: created?.id } }, { status: 201 });
+    return Response.json({ data: { id: created?.id }, idempotentReplay }, { status: idempotentReplay ? 200 : 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
+    if (message === "CUSTOMER_NOT_FOUND") return Response.json({ error: { message: "Select a customer from your own workspace." } }, { status: 400 });
     if (message === "INVOICE_NOT_FOUND") {
       return Response.json({ error: { message: "That invoice was not found in this workspace or cannot receive payments." } }, { status: 404 });
     }
     if (message === "PAYMENT_EXCEEDS_BALANCE") {
       return Response.json({ error: { message: "Payment is greater than the remaining invoice balance. Refresh the page and try again." } }, { status: 400 });
+    }
+    if ((error as { code?: string }).code === "P2002") {
+      return Response.json({ error: { message: "A duplicate transaction key was submitted. Retry with the same key to safely check the existing result." } }, { status: 409 });
+    }
+    if ((error as { code?: string }).code === "P2034") {
+      return Response.json({ error: { message: "Another transaction changed this invoice concurrently. Retry the same request with the same idempotency key." } }, { status: 409 });
     }
     const known = error as { code?: string };
     console.error("CRM create failed:", resource, known?.code || "UNKNOWN");

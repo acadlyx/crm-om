@@ -13,7 +13,7 @@ export const authOptions: NextAuthOptions = {
       const password = credentials?.password;
       if (!email || !password) return null;
       const user = await db.user.findUnique({ where: { email } });
-      if (!user || !(await compare(password, user.passwordHash))) return null;
+      if (!user || !user.isActive || !(await compare(password, user.passwordHash))) return null;
       return { id: user.id, name: user.name, email: user.email };
     },
   })],
@@ -21,10 +21,13 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user && token.email) {
         const user = await db.user.findUnique({ where: { email: token.email } });
-        if (user) {
+        if (user && user.isActive) {
           session.user.id = user.id;
-          session.user.role = user.role;
+          session.user.role = user.role as never;
           session.user.tenantId = user.tenantId;
+        } else {
+          // Invalidate existing JWT sessions for deactivated accounts.
+          session.user.email = "";
         }
       }
       return session;

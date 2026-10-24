@@ -23,6 +23,7 @@ import {
 import { authOptions } from "@/lib/auth";
 import { getPlatformBranding } from "@/lib/branding/service";
 import { db } from "@/lib/db";
+import { OwnerDashboard } from "@/components/owner-dashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -41,12 +42,15 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(value);
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id || !session.user.email) redirect("/login");
+  if (!session?.user?.id || !session.user.email) redirect("/logintoprivatecrmbysyzent7456");
 
   const isPlatformAdmin = session.user.role === "PLATFORM_ADMIN";
   const tenantId = session.user.tenantId;
+  if (tenantId && (session.user.role === "TENANT_ADMIN" || isPlatformAdmin)) {
+    return <OwnerDashboard tenantId={tenantId} searchParams={searchParams ? await searchParams : {}} />;
+  }
   const activityWhere = isPlatformAdmin && !tenantId ? {} : { actorUserId: session.user.id };
 
   const [
@@ -107,7 +111,7 @@ export default async function DashboardPage() {
       db.expense.aggregate({ where: { tenantId, status: "PAID", spentAt: { gte: monthStart } }, _sum: { amount: true } }),
       db.invoice.findMany({
         where: { tenantId, status: { not: "CANCELLED" } },
-        select: { total: true, dueDate: true, payments: { select: { amount: true } } },
+        select: { total: true, dueDate: true, payments: { select: { amount: true, status: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } },
       }),
       db.deal.aggregate({ where: { tenantId, stage: { notIn: ["WON", "LOST"] } }, _sum: { value: true }, _count: { _all: true } }),
       db.task.count({ where: { tenantId, status: { not: "DONE" } } }),
@@ -116,7 +120,7 @@ export default async function DashboardPage() {
     paidExpensesThisMonth = Number(expenseAggregate._sum.amount || 0);
     const now = new Date();
     for (const invoice of invoices) {
-      const paid = invoice.payments.reduce((sum, item) => sum + Number(item.amount), 0);
+      const paid = invoice.payments.filter((item) => item.status === "POSTED").reduce((sum, item) => sum + Number(item.amount), 0) + invoice.receiptAllocations.filter((allocation) => allocation.receipt.status === "POSTED").reduce((sum, allocation) => sum + Number(allocation.amount), 0);
       const balance = Math.max(0, Number(invoice.total) - paid);
       outstandingBalance += balance;
       if (balance > 0 && invoice.dueDate < now) overdueInvoiceCount += 1;

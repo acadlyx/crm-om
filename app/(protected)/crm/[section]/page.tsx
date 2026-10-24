@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireWorkspaceAccess } from "@/lib/crm/access";
+import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { db } from "@/lib/db";
 import { CrmModule, type CrmColumn, type CrmField } from "@/components/crm-module";
 import { Activity, ArrowRight, CircleDollarSign, FileWarning, HandCoins, TrendingUp, Wallet } from "lucide-react";
@@ -22,8 +23,11 @@ function humanize(value: string) {
 export default async function CrmSectionPage({ params }: { params: Promise<{ section: string }> }) {
   const { section } = await params;
   const access = await requireWorkspaceAccess();
-  if (!access.ok) redirect("/dashboard");
+  if (!access.ok) redirect("/logintoprivatecrmbysyzent7456");
   const tenantId = access.tenantId;
+  const permission = await requireWorkspacePermission(access, section, "read");
+  if (!permission.ok) notFound();
+  const updatePermission = await requireWorkspacePermission(access, section, "update");
 
   if (section === "reports") {
     const monthStart = new Date();
@@ -35,7 +39,7 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       db.expense.aggregate({ where: { tenantId, status: "PAID", spentAt: { gte: monthStart } }, _sum: { amount: true } }),
       db.invoice.findMany({
         where: { tenantId, status: { not: "CANCELLED" } },
-        select: { id: true, invoiceNumber: true, total: true, dueDate: true, status: true, customer: { select: { name: true } }, payments: { select: { amount: true } } },
+        select: { id: true, invoiceNumber: true, total: true, dueDate: true, status: true, customer: { select: { name: true } }, payments: { select: { amount: true, status: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } },
         orderBy: { dueDate: "asc" },
       }),
       db.deal.aggregate({ where: { tenantId, stage: { notIn: ["WON", "LOST"] } }, _sum: { value: true }, _count: { _all: true } }),
@@ -49,7 +53,9 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const outstanding = invoices.map((invoice) => {
-      const paid = invoice.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+      const legacyPaid = invoice.payments.filter((payment) => payment.status === "POSTED").reduce((sum, payment) => sum + Number(payment.amount), 0);
+      const allocatedPaid = invoice.receiptAllocations.filter((allocation) => allocation.receipt.status === "POSTED").reduce((sum, allocation) => sum + Number(allocation.amount), 0);
+      const paid = legacyPaid + allocatedPaid;
       return { ...invoice, paid, balance: Math.max(0, Number(invoice.total) - paid) };
     }).filter((invoice) => invoice.balance > 0);
     const overdue = outstanding.filter((invoice) => invoice.dueDate < today);
@@ -130,15 +136,28 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       title = "Customers"; resource = "customers"; recordLabel = "customer";
       description = "Keep every customer, company and contact detail in one workspace.";
       const records = await db.customer.findMany({ where: { tenantId }, orderBy: { createdAt: "desc" }, take: 300 });
-      rows = records.map((item) => ({ id: item.id, name: item.name, company: item.company, email: item.email, phone: item.phone, status: item.status, createdAt: item.createdAt.toISOString() }));
+      rows = records.map((item) => ({
+        id: item.id, name: item.name, company: item.company, email: item.email, phone: item.phone,
+        address: Array.isArray(item.addresses) ? item.addresses.map(String).join(", ") : "",
+        creditLimit: Number(item.creditLimit), paymentTermsDays: item.paymentTermsDays, notes: item.notes,
+        status: item.status, createdAt: item.createdAt.toISOString(),
+      }));
       fields = [
         { name: "name", label: "Contact / customer name", type: "text", required: true, placeholder: "Full name" },
         { name: "company", label: "Company", type: "text", placeholder: "Business name" },
         { name: "email", label: "Email", type: "email", placeholder: "name@company.com" },
         { name: "phone", label: "Phone", type: "tel", placeholder: "+91 ..." },
+        { name: "address", label: "Business / billing address", type: "textarea", placeholder: "Street, city, state, postal code" },
+        { name: "creditLimit", label: "Credit limit (₹; 0 = no limit)", type: "number", step: "0.01", placeholder: "0.00" },
+        { name: "paymentTermsDays", label: "Payment terms (days)", type: "number", step: "1", placeholder: "0" },
         { name: "notes", label: "Notes", type: "textarea", placeholder: "Preferences, context or next steps" },
       ];
-      columns = [{ key: "name", label: "Customer" }, { key: "company", label: "Company" }, { key: "email", label: "Email" }, { key: "phone", label: "Phone" }, { key: "status", label: "Status" }];
+      columns = [
+        { key: "name", label: "Customer" }, { key: "company", label: "Company" },
+        { key: "email", label: "Email" }, { key: "phone", label: "Phone" },
+        { key: "address", label: "Address" }, { key: "creditLimit", label: "Credit limit" },
+        { key: "paymentTermsDays", label: "Terms (days)" }, { key: "status", label: "Status" },
+      ];
       workflow = { field: "status", label: "Status", options: [{ label: "Active", value: "ACTIVE" }, { label: "Inactive", value: "INACTIVE" }] };
       break;
     }
@@ -182,9 +201,9 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
     case "invoices": {
       title = "Invoices"; resource = "invoices"; recordLabel = "invoice";
       description = "Create customer invoices, set due dates and see exactly what is still owed.";
-      const records = await db.invoice.findMany({ where: { tenantId }, include: { customer: { select: { name: true, company: true } }, payments: { select: { amount: true } } }, orderBy: { createdAt: "desc" }, take: 300 });
+      const records = await db.invoice.findMany({ where: { tenantId }, include: { customer: { select: { name: true, company: true } }, payments: { select: { amount: true, status: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } }, orderBy: { createdAt: "desc" }, take: 300 });
       rows = records.map((item) => {
-        const paidAmount = item.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+        const paidAmount = item.payments.filter((p) => p.status === "POSTED").reduce((sum, p) => sum + Number(p.amount), 0) + item.receiptAllocations.filter((allocation) => allocation.receipt.status === "POSTED").reduce((sum, allocation) => sum + Number(allocation.amount), 0);
         const balance = Math.max(0, Number(item.total) - paidAmount);
         const today = new Date(); today.setHours(0, 0, 0, 0);
         const status = balance > 0 && item.dueDate < today && item.status !== "CANCELLED" ? "OVERDUE" : item.status;
@@ -206,11 +225,11 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       description = "Log cash, UPI, card, cheque or bank-transfer receipts against invoices. Balances and invoice status update automatically.";
       const [records, invoicesForPayment] = await Promise.all([
         db.payment.findMany({ where: { tenantId }, include: { invoice: { select: { invoiceNumber: true, customer: { select: { name: true } } } } }, orderBy: { paidAt: "desc" }, take: 300 }),
-        db.invoice.findMany({ where: { tenantId, status: { not: "CANCELLED" } }, include: { customer: { select: { name: true } }, payments: { select: { amount: true } } }, orderBy: { dueDate: "asc" }, take: 300 }),
+        db.invoice.findMany({ where: { tenantId, status: { not: "CANCELLED" } }, include: { customer: { select: { name: true } }, payments: { select: { amount: true, status: true } }, receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } } }, orderBy: { dueDate: "asc" }, take: 300 }),
       ]);
-      rows = records.map((item) => ({ id: item.id, invoiceNumber: item.invoice.invoiceNumber, customerName: item.invoice.customer.name, amount: Number(item.amount), method: item.method, reference: item.reference, paidAt: item.paidAt.toISOString() }));
+      rows = records.map((item) => ({ id: item.id, invoiceNumber: item.invoice.invoiceNumber, customerName: item.invoice.customer.name, amount: Number(item.amount), method: item.method, reference: item.reference, paidAt: item.paidAt.toISOString(), status: item.status }));
       const invoiceOptions = invoicesForPayment.map((item) => {
-        const paid = item.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+        const paid = item.payments.filter((payment) => payment.status === "POSTED").reduce((sum, payment) => sum + Number(payment.amount), 0) + item.receiptAllocations.filter((allocation) => allocation.receipt.status === "POSTED").reduce((sum, allocation) => sum + Number(allocation.amount), 0);
         return { item, balance: Math.max(0, Number(item.total) - paid) };
       }).filter(({ balance }) => balance > 0.005).map(({ item, balance }) => ({ label: item.invoiceNumber + " · " + item.customer.name + " · Due " + currency(balance), value: item.id }));
       fields = [
@@ -221,7 +240,7 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
         { name: "paidAt", label: "Payment date", type: "date" },
         { name: "notes", label: "Notes", type: "textarea", placeholder: "Optional receipt notes" },
       ];
-      columns = [{ key: "invoiceNumber", label: "Invoice" }, { key: "customerName", label: "Customer" }, { key: "amount", label: "Amount received" }, { key: "method", label: "Method" }, { key: "reference", label: "Reference" }, { key: "paidAt", label: "Received on" }];
+      columns = [{ key: "invoiceNumber", label: "Invoice" }, { key: "customerName", label: "Customer" }, { key: "amount", label: "Amount received" }, { key: "method", label: "Method" }, { key: "reference", label: "Reference" }, { key: "paidAt", label: "Received on" }, { key: "status", label: "Status" }];
       if (!invoiceOptions.length) description = "No unpaid invoices right now. Create an invoice first; the system will prevent payments greater than the amount still owed.";
       break;
     }
@@ -265,5 +284,5 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       notFound();
   }
 
-  return <CrmModule key={JSON.stringify(rows)} resource={resource} title={title} description={description} fields={fields} columns={columns} initialRows={rows} workflow={workflow} recordLabel={recordLabel} />;
+  return <CrmModule key={JSON.stringify(rows)} resource={resource} title={title} description={description} fields={fields} columns={columns} initialRows={rows} workflow={workflow} recordLabel={recordLabel} owner={access.user.role === "TENANT_ADMIN" || access.user.role === "PLATFORM_ADMIN"} canUpdate={updatePermission.ok} />;
 }
