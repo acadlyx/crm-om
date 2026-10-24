@@ -88,11 +88,13 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
   const nextWeek = new Date(today); nextWeek.setDate(nextWeek.getDate() + 7);
   const priorMonth = new Date(today); priorMonth.setDate(priorMonth.getDate() - 30);
 
+  /* eslint-disable @typescript-eslint/no-explicit-any -- Queries below use different explicit Prisma select projections; the single heterogeneous result bundle keeps the loading-failure state atomic. */
   let datasets: {
     salesOrders: any[]; periodDeliveries: any[]; periodInvoices: any[]; allInvoices: any[]; periodPayments: any[];
     periodReceipts: any[]; products: any[]; pendingDeliveries: any[]; bills: any[];
     periodSupplierPayments: any[]; purchaseOrders: any[]; followUps: any[]; tasks: any[]; movements: any[];
   };
+  /* eslint-enable @typescript-eslint/no-explicit-any */
   try {
     const [
       salesOrders, periodDeliveries, periodInvoices, allInvoices, periodPayments, periodReceipts, products,
@@ -211,7 +213,13 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
     return { ...bill, balance: Math.max(0, number(bill.total) - paid) };
   }).filter((bill) => bill.balance > 0.005);
   const payableTotal = payables.reduce((sum, bill) => sum + bill.balance, 0);
-  const deliveredProfitLines = periodDeliveries.flatMap((delivery) => delivery.items.map((item: any) => {
+  type DeliveredProfitItem = {
+    quantity: unknown;
+    unitCost: unknown | null;
+    product: { purchaseCost: unknown; name: string; sku: string };
+    orderItem: { quantity: unknown; unitPrice: unknown; discountAmount: unknown };
+  };
+  const deliveredProfitLines = periodDeliveries.flatMap((delivery: { items: DeliveredProfitItem[] }) => delivery.items.map((item) => {
     const quantity = number(item.quantity);
     const orderedQuantity = Math.max(number(item.orderItem.quantity), 0.000001);
     const revenue = quantity * number(item.orderItem.unitPrice) - number(item.orderItem.discountAmount) * quantity / orderedQuantity;
