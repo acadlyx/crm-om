@@ -113,7 +113,7 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
           id: true, deliveryNumber: true, completedAt: true,
           order: { select: { id: true, orderNumber: true, customer: { select: { id: true, name: true } } } },
           items: { select: {
-            quantity: true, unitCost: true,
+            productId: true, quantity: true, unitCost: true,
             product: { select: { name: true, sku: true, purchaseCost: true } },
             orderItem: { select: { quantity: true, unitPrice: true, discountAmount: true } },
           } },
