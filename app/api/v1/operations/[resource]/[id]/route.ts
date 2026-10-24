@@ -140,13 +140,31 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
         const order = await tx.salesOrder.findFirst({
           where: { id, tenantId },
           include: {
-            customer: { select: { id: true, name: true, paymentTermsDays: true } },
+            customer: { select: { id: true, name: true, paymentTermsDays: true, creditLimit: true } },
             items: true,
           },
         });
         if (!order) return { kind: "NOT_FOUND" as const };
         if (!["CONFIRMED", "PARTIALLY_DELIVERED", "DELIVERED"].includes(order.status)) {
           return { kind: "INVALID_STATUS" as const };
+        }
+        const creditLimit = n(order.customer.creditLimit);
+        if (order.customer.paymentTermsDays > 0 && creditLimit > 0) {
+          const openInvoices = await tx.invoice.findMany({
+            where: { tenantId, customerId: order.customerId, status: { not: "CANCELLED" } },
+            include: {
+              payments: { select: { amount: true, status: true } },
+              receiptAllocations: { select: { amount: true, receipt: { select: { status: true } } } },
+            },
+          });
+          const currentExposure = openInvoices.reduce((sum, invoice) => {
+            const postedPayments = invoice.payments.filter((payment) => payment.status === "POSTED").reduce((total, payment) => total + n(payment.amount), 0);
+            const allocatedReceipts = invoice.receiptAllocations.filter((allocation) => allocation.receipt.status === "POSTED").reduce((total, allocation) => total + n(allocation.amount), 0);
+            return sum + Math.max(0, n(invoice.total) - postedPayments - allocatedReceipts);
+          }, 0);
+          if (currentExposure + n(order.total) > creditLimit + 0.005) {
+            return { kind: "CREDIT_LIMIT_EXCEEDED" as const, creditLimit, currentExposure };
+          }
         }
         const issueDate = new Date();
         const dueDate = new Date(issueDate);
@@ -196,6 +214,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       if (result.kind === "NOT_FOUND") return fail("Sales order not found in this workspace.", 404);
       if (result.kind === "INVALID_STATUS") return fail("Confirm the sales order before issuing its invoice.", 409);
+      if (result.kind === "CREDIT_LIMIT_EXCEEDED") return fail("Invoice not issued: this credit sale would exceed the configured customer credit limit. Current exposure " + n(result.currentExposure).toFixed(2) + ", limit " + n(result.creditLimit).toFixed(2) + ".", 409);
       return Response.json({ data: result.invoice, idempotentReplay: result.kind === "EXISTING" }, { status: result.kind === "EXISTING" ? 200 : 201 });
     }
 
