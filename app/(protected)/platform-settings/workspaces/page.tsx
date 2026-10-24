@@ -9,13 +9,21 @@ export const dynamic = "force-dynamic";
 
 const crmMigration = "20261024000100_business_crm_core";
 
+type WorkspaceRow = {
+  id: string;
+  slug: string;
+  createdAt: Date;
+  settings: { businessName: string; contactEmail: string | null } | null;
+  _count: { users: number; customers: number; leads: number; invoices: number };
+};
+
 export default async function WorkspacesPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) redirect("/login");
   const user = await db.user.findUnique({ where: { email: session.user.email }, select: { role: true, name: true, email: true, tenantId: true } });
   if (user?.role !== "PLATFORM_ADMIN") redirect("/dashboard");
 
-  let tenants: Awaited<ReturnType<typeof db.tenant.findMany>> = [];
+  let tenants: WorkspaceRow[] = [];
   let crmSchemaReady = true;
 
   try {
