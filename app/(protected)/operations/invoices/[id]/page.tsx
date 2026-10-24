@@ -30,7 +30,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
         customer: true,
         items: { include: { product: { select: { sku: true, name: true, unit: true } } } },
         salesOrder: { select: { orderNumber: true } },
-        payments: { select: { amount: true, status: true } },
+        payments: { select: { amount: true, status: true, paidAt: true } },
         receiptAllocations: { include: { receipt: { select: { amount: true, status: true, method: true, receivedAt: true, receiptNumber: true } } } },
       },
     }),
@@ -108,7 +108,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
           {invoice.payments.filter((payment) => payment.status === "POSTED").length + invoice.receiptAllocations.filter((allocation) => allocation.receipt.status === "POSTED").length === 0
             ? <p>No payments have been recorded against this invoice.</p>
             : <ul>
-              {invoice.payments.filter((payment) => payment.status === "POSTED").map((payment, index) => <li key={"payment-" + index}><span>Payment received · {date(invoice.issueDate)}</span><strong>{amount(payment.amount, currency)}</strong></li>)}
+              {invoice.payments.filter((payment) => payment.status === "POSTED").map((payment, index) => <li key={"payment-" + index}><span>Payment received · {date(payment.paidAt)}</span><strong>{amount(payment.amount, currency)}</strong></li>)}
               {invoice.receiptAllocations.filter((allocation) => allocation.receipt.status === "POSTED").map((allocation) => <li key={allocation.id}><span>{allocation.receipt.receiptNumber} · {allocation.receipt.method} · {date(allocation.receipt.receivedAt)}</span><strong>{amount(allocation.amount, currency)}</strong></li>)}
             </ul>}
         </section>
