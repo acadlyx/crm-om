@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   AlertCircle, ArrowDownToLine, ArrowRight, CheckCircle2, LoaderCircle,
   Plus, RefreshCw, Search, X,
@@ -186,6 +186,8 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
     setCatalogs((current) => ({ ...current, ...Object.fromEntries(loaded) }));
   }, [resource]);
 
+  // The loaders perform asynchronous fetches; their state updates happen only after the network resolves.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     void loadRows();
     void loadCatalogs().catch((cause) => setError(cause instanceof Error ? cause.message : "Could not load form options."));
