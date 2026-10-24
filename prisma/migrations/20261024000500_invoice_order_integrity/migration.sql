@@ -4,3 +4,7 @@ ALTER TABLE "invoices"
   ADD CONSTRAINT "invoices_discount_amount_nonnegative_check" CHECK ("discount_amount" >= 0);
 
 CREATE UNIQUE INDEX "invoices_tenant_id_sales_order_id_key" ON "invoices"("tenant_id", "sales_order_id");
+
+ALTER TABLE "invoice_items"
+  ADD COLUMN "discount_amount" DECIMAL(12,2) NOT NULL DEFAULT 0,
+  ADD CONSTRAINT "invoice_items_discount_amount_nonnegative_check" CHECK ("discount_amount" >= 0);
