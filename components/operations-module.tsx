@@ -114,7 +114,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
   const [error, setError] = useState("");
   const [orderLines, setOrderLines] = useState<SalesLine[]>([{ productId: "", quantity: "1", discountPercent: "0", taxPercent: "0" }]);
   const [purchaseLines, setPurchaseLines] = useState([{ productId: "", quantity: "1" }]);
-  const [receiptLines, setReceiptLines] = useState([{ purchaseOrderItemId: "", quantity: "1", unitCost: "" }]);
+  const [receiptLines, setReceiptLines] = useState([{ purchaseOrderItemId: "", quantity: "1" }]);
   const [deliveryLines, setDeliveryLines] = useState([{ orderItemId: "", quantity: "1" }]);
   const [allocations, setAllocations] = useState<Allocation[]>([{ invoiceId: "", amount: "" }]);
   const [supplierAllocations, setSupplierAllocations] = useState<Allocation[]>([{ billId: "", amount: "" }]);
@@ -233,7 +233,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
     } else if (resource === "purchase-orders") {
       payload = { ...raw, items: purchaseLines.filter((line) => line.productId).map((line) => ({ productId: line.productId, quantity: Number(line.quantity) })), idempotencyKey: idempotencyKey() };
     } else if (resource === "goods-receipts") {
-      payload = { ...raw, purchaseOrderId: selectedOrderId, items: receiptLines.filter((line) => line.purchaseOrderItemId).map((line) => ({ purchaseOrderItemId: line.purchaseOrderItemId, quantity: Number(line.quantity), ...(line.unitCost ? { unitCost: Number(line.unitCost) } : {}) })), idempotencyKey: idempotencyKey() };
+      payload = { ...raw, purchaseOrderId: selectedOrderId, items: receiptLines.filter((line) => line.purchaseOrderItemId).map((line) => ({ purchaseOrderItemId: line.purchaseOrderItemId, quantity: Number(line.quantity) })), idempotencyKey: idempotencyKey() };
     } else if (resource === "deliveries") {
       payload = { ...raw, orderId: selectedOrderId, items: deliveryLines.filter((line) => line.orderItemId).map((line) => ({ orderItemId: line.orderItemId, quantity: Number(line.quantity) })), idempotencyKey: idempotencyKey() };
     } else if (resource === "customer-receipts") {
@@ -243,7 +243,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
     } else if (resource === "supplier-payments") {
       payload = { ...raw, amount: Number(raw.amount), allocations: supplierAllocations.filter((line) => line.billId && line.amount).map((line) => ({ billId: line.billId, amount: Number(line.amount) })), idempotencyKey: idempotencyKey() };
     } else if (resource === "inventory") {
-      payload = { ...raw, quantity: Number(raw.quantity), unitCost: Number(raw.unitCost || 0), idempotencyKey: idempotencyKey() };
+      payload = { ...raw, quantity: Number(raw.quantity), idempotencyKey: idempotencyKey() };
     } else if (resource === "customer-follow-ups") {
       payload = { ...raw, dueAt: raw.dueAt ? new Date(String(raw.dueAt)).toISOString() : undefined, idempotencyKey: idempotencyKey() };
     } else if (resource === "permissions") {
@@ -284,7 +284,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
       if (editingDraftOrder) { setEditingOrder(null); setFormOpen(false); }
       setOrderLines([{ productId: "", quantity: "1", discountPercent: "0", taxPercent: "0" }]);
       setPurchaseLines([{ productId: "", quantity: "1" }]);
-      setReceiptLines([{ purchaseOrderItemId: "", quantity: "1", unitCost: "" }]);
+      setReceiptLines([{ purchaseOrderItemId: "", quantity: "1" }]);
       setDeliveryLines([{ orderItemId: "", quantity: "1" }]);
       setAllocations([{ invoiceId: "", amount: "" }]);
       setSupplierAllocations([{ billId: "", amount: "" }]);
@@ -458,7 +458,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
           </>}
           {resource === "goods-receipts" && <>
             <div className="operations-form-grid">
-              <label className="field"><span>Purchase order *</span><select value={selectedOrderId} required onChange={(event) => { setSelectedOrderId(event.target.value); setReceiptLines([{ purchaseOrderItemId: "", quantity: "1", unitCost: "" }]); }}><option value="">Select open purchase order</option>{catalogs.purchaseOrders.filter((item) => ["ORDERED", "PARTIALLY_RECEIVED"].includes(item.status)).map((item) => <option value={item.id} key={item.id}>{item.orderNumber} · {item.supplier?.name}</option>)}</select></label>
+              <label className="field"><span>Purchase order *</span><select value={selectedOrderId} required onChange={(event) => { setSelectedOrderId(event.target.value); setReceiptLines([{ purchaseOrderItemId: "", quantity: "1" }]); }}><option value="">Select open purchase order</option>{catalogs.purchaseOrders.filter((item) => ["ORDERED", "PARTIALLY_RECEIVED"].includes(item.status)).map((item) => <option value={item.id} key={item.id}>{item.orderNumber} · {item.supplier?.name}</option>)}</select></label>
               <TextField name="receivedAt" label="Received at" type="datetime-local" />
               <TextField name="notes" label="Receipt notes" />
             </div>
@@ -518,10 +518,9 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
                 { value: "SALE_RETURN", label: "Customer return" }, { value: "PURCHASE_RETURN", label: "Return to supplier" },
               ]} />
               <TextField name="quantity" label="Quantity *" type="number" min="0.001" step="0.001" required />
-              <TextField name="unitCost" label="Unit cost" type="number" min="0" step="0.01" defaultValue="0" />
               <TextField name="notes" label="Reason / transaction note *" required placeholder="Reason for adjustment" />
             </div>
-            <p className="owner-footnote">Stock cannot be reduced below zero. Every adjustment has a transaction reference and audit event. Use goods receipts and delivery posting for normal business flows.</p>
+            <p className="owner-footnote">Stock cannot be reduced below zero. Adjustment cost comes from the saved product cost; every movement has a transaction reference and audit event. Use goods receipts and delivery posting for normal business flows.</p>
           </>}
           {resource === "customer-follow-ups" && <div className="operations-form-grid">
             <SelectField name="customerId" label="Customer *" required options={customerOptions} placeholder="Select customer" />
@@ -607,13 +606,12 @@ function LineEditor({ title, lines, setLines, productOptions, mode }: {
   </div>;
 }
 
-type ReceiptLine = { purchaseOrderItemId: string; quantity: string; unitCost: string };
+type ReceiptLine = { purchaseOrderItemId: string; quantity: string };
 function ReceiptLineEditor({ lines, setLines, options }: { lines: ReceiptLine[]; setLines: (lines: ReceiptLine[]) => void; options: Array<{value:string;label:string}> }) {
-  return <div className="operations-lines"><div className="operations-lines-heading"><strong>Receipt quantities</strong><button type="button" className="crm-secondary-button" onClick={()=>setLines([...lines,{purchaseOrderItemId:"",quantity:"1",unitCost:""}])}><Plus size={14}/>Add line</button></div>
+  return <div className="operations-lines"><div className="operations-lines-heading"><strong>Receipt quantities</strong><button type="button" className="crm-secondary-button" onClick={()=>setLines([...lines,{purchaseOrderItemId:"",quantity:"1"}])}><Plus size={14}/>Add line</button></div>
     {lines.map((line,index)=><div className="operations-line-row" key={index}>
       <label className="field"><span>Purchase-order line</span><select required={index===0} value={line.purchaseOrderItemId} onChange={(event)=>setLines(lines.map((entry,i)=>i===index?{...entry,purchaseOrderItemId:event.target.value}:entry))}><option value="">Select item</option>{options.map((option)=><option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
       <label className="field"><span>Received quantity</span><input type="number" min="0.001" step="0.001" required value={line.quantity} onChange={(event)=>setLines(lines.map((entry,i)=>i===index?{...entry,quantity:event.target.value}:entry))}/></label>
-      <label className="field"><span>Actual unit cost (optional)</span><input type="number" min="0" step="0.01" value={line.unitCost} onChange={(event)=>setLines(lines.map((entry,i)=>i===index?{...entry,unitCost:event.target.value}:entry))}/></label>
       {lines.length>1&&<button type="button" className="crm-secondary-button operations-remove-line" onClick={()=>setLines(lines.filter((_,i)=>i!==index))}>Remove</button>}
     </div>)}
   </div>;
