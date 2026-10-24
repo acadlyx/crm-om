@@ -207,7 +207,7 @@ export async function OwnerDashboard({ tenantId, searchParams }: { tenantId: str
     { label: "60+ days", value: overdue.filter((item) => item.daysOverdue > 60).reduce((sum, item) => sum + item.balance, 0) },
   ];
   const payables = bills.map((bill) => {
-    const paid = bill.allocations.filter((item) => item.payment.status === "POSTED").reduce((sum, item) => sum + number(item.amount), 0);
+    const paid = bill.allocations.filter((item: { payment: { status: string }; amount: unknown }) => item.payment.status === "POSTED").reduce((sum: number, item: { amount: unknown }) => sum + number(item.amount), 0);
     return { ...bill, balance: Math.max(0, number(bill.total) - paid) };
   }).filter((bill) => bill.balance > 0.005);
   const payableTotal = payables.reduce((sum, bill) => sum + bill.balance, 0);
