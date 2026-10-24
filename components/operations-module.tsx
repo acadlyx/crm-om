@@ -9,12 +9,12 @@ import {
 type Row = Record<string, any> & { id: string };
 type Catalogs = {
   customers: Row[]; invoices: Row[]; products: Row[]; suppliers: Row[];
-  salesOrders: Row[]; purchaseOrders: Row[]; supplierBills: Row[];
+  salesOrders: Row[]; purchaseOrders: Row[]; supplierBills: Row[]; team: Row[];
 };
 type Column = { key: string; label: string };
 
 const defaultCatalogs: Catalogs = {
-  customers: [], invoices: [], products: [], suppliers: [], salesOrders: [], purchaseOrders: [], supplierBills: [],
+  customers: [], invoices: [], products: [], suppliers: [], salesOrders: [], purchaseOrders: [], supplierBills: [], team: [],
 };
 
 const moduleConfig: Record<string, { title: string; description: string; columns: Column[]; empty: string; writable: boolean }> = {
@@ -144,7 +144,10 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
     const requests: Array<[keyof Catalogs, string]> = [];
     if (["sales-orders", "deliveries"].includes(resource)) {
       if (resource === "sales-orders") requests.push(["customers", "/api/v1/crm/customers"]);
-      if (resource === "deliveries") requests.push(["salesOrders", "/api/v1/operations/sales-orders"]);
+      if (resource === "deliveries") {
+        requests.push(["salesOrders", "/api/v1/operations/sales-orders"]);
+        requests.push(["team", "/api/v1/operations/team"]);
+      }
       if (resource === "sales-orders" || resource === "deliveries") requests.push(["products", "/api/v1/operations/products"]);
     }
     if (["purchase-orders", "goods-receipts"].includes(resource)) {
@@ -168,7 +171,10 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
       requests.push(["supplierBills", "/api/v1/operations/supplier-bills"]);
     }
     if (resource === "inventory") requests.push(["products", "/api/v1/operations/products"]);
-    if (resource === "customer-follow-ups") requests.push(["customers", "/api/v1/crm/customers"]);
+    if (resource === "customer-follow-ups") {
+      requests.push(["customers", "/api/v1/crm/customers"]);
+      requests.push(["team", "/api/v1/operations/team"]);
+    }
     if (!requests.length) return;
     const loaded = await Promise.all(requests.map(async ([key, url]) => {
       const response = await fetch(url, { cache: "no-store" });
@@ -199,6 +205,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
   const customerOptions = catalogs.customers.map((item) => ({ value: item.id, label: item.name + (item.company ? " · " + item.company : "") }));
   const productOptions = catalogs.products.filter((item) => item.status !== "INACTIVE").map((item) => ({ value: item.id, label: item.sku + " · " + item.name + " (on hand " + item.stockOnHand + ")" }));
   const supplierOptions = catalogs.suppliers.filter((item) => item.status !== "INACTIVE").map((item) => ({ value: item.id, label: item.name + (item.company ? " · " + item.company : "") }));
+  const teamOptions = catalogs.team.filter((item) => item.isActive).map((item) => ({ value: item.id, label: item.name + " · " + item.role.replaceAll("_", " ") }));
   const invoiceOptions = catalogs.invoices.filter((item) => {
     if (item.status === "CANCELLED") return false;
     const paid = (item.payments || []).reduce((sum: number, p: Row) => sum + Number(p.amount || 0), 0)
@@ -400,7 +407,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
             <div className="operations-form-grid">
               <label className="field"><span>Sales order *</span><select required value={selectedOrderId} onChange={(event) => { setSelectedOrderId(event.target.value); setDeliveryLines([{ orderItemId: "", quantity: "1" }]); }}><option value="">Select confirmed order</option>{catalogs.salesOrders.filter((item) => ["CONFIRMED", "PARTIALLY_DELIVERED"].includes(item.status)).map((item) => <option key={item.id} value={item.id}>{item.orderNumber} · {item.customer?.name}</option>)}</select></label>
               <TextField name="scheduledAt" label="Scheduled delivery" type="datetime-local" />
-              <SelectField name="assignedUserId" label="Assigned staff user ID (optional)" options={[]} placeholder="Optional — select after team integration" />
+              <SelectField name="assignedUserId" label="Assign to staff (optional)" options={teamOptions} placeholder="Unassigned" />
             </div>
             <DeliveryLineEditor lines={deliveryLines} setLines={setDeliveryLines} options={(catalogs.salesOrders.find((item) => item.id === selectedOrderId)?.items || []).filter((item: Row) => Number(item.deliveredQuantity) < Number(item.quantity)).map((item: Row) => {
               const pending = (catalogs.salesOrders.find((order) => order.id === selectedOrderId)?.deliveries || []).filter((delivery: Row) => !["CANCELLED", "FAILED", "DELIVERED", "PARTIALLY_DELIVERED"].includes(delivery.status)).flatMap((delivery: Row) => delivery.items || []).filter((deliveryItem: Row) => deliveryItem.orderItemId === item.id).reduce((sum: number, deliveryItem: Row) => sum + Number(deliveryItem.quantity), 0);
@@ -460,7 +467,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
             <TextField name="title" label="Follow-up title *" required />
             <TextField name="dueAt" label="Due date/time *" type="datetime-local" required />
             <SelectField name="channel" label="Channel" options={[{ value: "PHONE", label: "Phone" }, { value: "EMAIL", label: "Email" }, { value: "WHATSAPP", label: "WhatsApp (provider must be configured)" }, { value: "IN_PERSON", label: "In person" }]} placeholder="Select channel" />
-            <TextField name="assignedUserId" label="Assigned user ID (optional)" />
+            <SelectField name="assignedUserId" label="Assigned staff member (optional)" options={teamOptions} placeholder="Unassigned" />
             <TextField name="notes" label="Notes" />
           </div>}
           {resource === "permissions" && <>
