@@ -17,6 +17,15 @@ function date(value: Date | string) {
   return Number.isNaN(parsed.valueOf()) ? "—" : new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(parsed);
 }
 
+function formatCustomerAddress(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (Array.isArray(value)) return value.map(formatCustomerAddress).filter(Boolean).join(", ");
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).map(formatCustomerAddress).filter(Boolean).join(", ");
+  }
+  return "";
+}
+
 export default async function InvoiceDocumentPage({ params }: { params: Promise<{ id: string }> }) {
   const access = await requireWorkspaceAccess();
   if (!access.ok) redirect("/logintoprivatecrmbysyzent7456");
@@ -43,6 +52,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
   const balance = Math.max(0, Number(invoice.total) - paid);
   const currency = business?.currency || "INR";
   const companyName = business?.businessName || platform.productName;
+  const customerAddress = formatCustomerAddress(invoice.customer.addresses);
 
   return (
     <div className="invoice-document-page">
@@ -72,7 +82,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
           {invoice.customer.company && <p>{invoice.customer.company}</p>}
           {invoice.customer.email && <p>{invoice.customer.email}</p>}
           {invoice.customer.phone && <p>{invoice.customer.phone}</p>}
-          {invoice.customer.address && <p>{invoice.customer.address}</p>}
+          {customerAddress && <p>{customerAddress}</p>}
         </section>
 
         <div className="invoice-lines-wrap"><table className="invoice-lines-table">
