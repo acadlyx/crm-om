@@ -33,8 +33,8 @@ export function normalizeReceiptTemplate(value: unknown): ReceiptTemplate {
   const color = typeof input.accentColor === "string" && /^#[0-9a-fA-F]{6}$/.test(input.accentColor)
     ? input.accentColor.toUpperCase()
     : DEFAULT_RECEIPT_TEMPLATE.accentColor;
-  const footerText = typeof input.footerText === "string" ? input.footerText.trim().slice(0, 400) : "";
-  const signatureLabel = typeof input.signatureLabel === "string" ? input.signatureLabel.trim().slice(0, 80) : "";
+  const footerText = typeof input.footerText === "string" ? input.footerText.trim().slice(0, 400) : DEFAULT_RECEIPT_TEMPLATE.footerText;
+  const signatureLabel = typeof input.signatureLabel === "string" ? input.signatureLabel.trim().slice(0, 80) : DEFAULT_RECEIPT_TEMPLATE.signatureLabel;
   const bool = (key: keyof Pick<ReceiptTemplate, "showAllocations" | "showReference" | "showNotes" | "showCustomerContact">) =>
     typeof input[key] === "boolean" ? input[key] as boolean : DEFAULT_RECEIPT_TEMPLATE[key];
 
