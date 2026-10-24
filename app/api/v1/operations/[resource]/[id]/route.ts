@@ -148,8 +148,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
         if (!["CONFIRMED", "PARTIALLY_DELIVERED", "DELIVERED"].includes(order.status)) {
           return { kind: "INVALID_STATUS" as const };
         }
+        const businessSettings = await tx.businessSettings.findUnique({
+          where: { tenantId },
+          select: { invoicePrefix: true, defaultPaymentTermsDays: true },
+        });
+        const customerTerms = order.customer.paymentTermsDays > 0
+          ? order.customer.paymentTermsDays
+          : businessSettings?.defaultPaymentTermsDays ?? 0;
         const creditLimit = n(order.customer.creditLimit);
-        if (order.customer.paymentTermsDays > 0 && creditLimit > 0) {
+        if (customerTerms > 0 && creditLimit > 0) {
           const openInvoices = await tx.invoice.findMany({
             where: { tenantId, customerId: order.customerId, status: { not: "CANCELLED" } },
             include: {
@@ -168,8 +175,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
         }
         const issueDate = new Date();
         const dueDate = new Date(issueDate);
-        dueDate.setDate(dueDate.getDate() + Math.max(0, order.customer.paymentTermsDays));
-        const invoiceNumber = "INV-" + issueDate.toISOString().slice(0, 10).replace(/-/g, "") + "-" + crypto.randomUUID().slice(0, 8).toUpperCase();
+        dueDate.setDate(dueDate.getDate() + Math.max(0, customerTerms));
+        const invoicePrefix = businessSettings?.invoicePrefix?.trim() || "INV";
+        const invoiceNumber = invoicePrefix + "-" + issueDate.toISOString().slice(0, 10).replace(/-/g, "") + "-" + crypto.randomUUID().slice(0, 8).toUpperCase();
         const invoice = await tx.invoice.create({
           data: {
             tenantId,
