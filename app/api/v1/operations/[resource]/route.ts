@@ -399,6 +399,10 @@ export async function POST(request: Request, context: { params: Promise<{ resour
         if (existing) return { existing: true, delivery: existing };
         const order = await tx.salesOrder.findFirst({ where: { id: data.orderId, tenantId, status: { in: ["CONFIRMED", "PARTIALLY_DELIVERED"] } }, include: { items: { include: { deliveryItems: { include: { delivery: { select: { status: true } } } } } } } });
         if (!order) throw new Error("ORDER_NOT_DELIVERABLE");
+        if (data.assignedUserId) {
+          const assignee = await tx.user.findFirst({ where: { id: data.assignedUserId, tenantId, isActive: true }, select: { id: true } });
+          if (!assignee) throw new Error("ASSIGNEE_NOT_FOUND");
+        }
         const orderItems = new Map(order.items.map((item) => [item.id, item]));
         for (const line of data.items) {
           const item = orderItems.get(line.orderItemId);
@@ -554,19 +558,26 @@ export async function POST(request: Request, context: { params: Promise<{ resour
     }
 
     if (resource === "customer-follow-ups") {
-      const customer = await db.customer.findFirst({ where: { id: data.customerId, tenantId } });
-      if (!customer) return fail("Customer not found in this workspace.", 404);
-      const followUp = await db.customerFollowUp.upsert({
-        where: { tenantId_idempotencyKey: { tenantId, idempotencyKey: data.idempotencyKey } },
-        create: {
-          tenantId, customerId: customer.id, title: data.title, dueAt: data.dueAt,
-          channel: data.channel ?? null, notes: data.notes ?? null, assignedUserId: data.assignedUserId ?? null,
-          idempotencyKey: data.idempotencyKey, createdByUserId: actorId,
-        },
-        update: {},
-      });
-      await db.auditLog.create({ data: { actorUserId: actorId, action: "FOLLOW_UP_CREATED", entityType: "CustomerFollowUp", entityId: followUp.id } });
-      return Response.json({ data: serialise(followUp) }, { status: 201 });
+      const result = await db.$transaction(async (tx) => {
+        const existing = await tx.customerFollowUp.findUnique({ where: { tenantId_idempotencyKey: { tenantId, idempotencyKey: data.idempotencyKey } } });
+        if (existing) return { existing: true, followUp: existing };
+        const customer = await tx.customer.findFirst({ where: { id: data.customerId, tenantId } });
+        if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
+        if (data.assignedUserId) {
+          const assignee = await tx.user.findFirst({ where: { id: data.assignedUserId, tenantId, isActive: true }, select: { id: true } });
+          if (!assignee) throw new Error("ASSIGNEE_NOT_FOUND");
+        }
+        const followUp = await tx.customerFollowUp.create({
+          data: {
+            tenantId, customerId: customer.id, title: data.title, dueAt: data.dueAt,
+            channel: data.channel ?? null, notes: data.notes ?? null, assignedUserId: data.assignedUserId ?? null,
+            idempotencyKey: data.idempotencyKey, createdByUserId: actorId,
+          },
+        });
+        await audit(tx, actorId, "FOLLOW_UP_CREATED", "CustomerFollowUp", followUp.id, { customerId: customer.id });
+        return { existing: false, followUp };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      return Response.json({ data: serialise(result.followUp), idempotentReplay: result.existing }, { status: result.existing ? 200 : 201 });
     }
 
     if (resource === "permissions") {
@@ -601,6 +612,7 @@ export async function POST(request: Request, context: { params: Promise<{ resour
       PO_ITEM_NOT_FOUND: [400, "A receipt item does not belong to the selected purchase order."],
       RECEIPT_EXCEEDS_ORDERED: [409, "Received quantity would exceed the ordered quantity."],
       ORDER_NOT_DELIVERABLE: [409, "Only confirmed or partially delivered orders can be dispatched."],
+      ASSIGNEE_NOT_FOUND: [400, "Choose an active team member from this workspace."],
       ORDER_ITEM_NOT_FOUND: [400, "A delivery item does not belong to the selected order."],
       DELIVERY_EXCEEDS_ORDERED: [409, "Delivered plus pending quantity would exceed the order quantity."],
       INVOICE_NOT_FOUND: [404, "An allocated invoice was not found for this customer."],
