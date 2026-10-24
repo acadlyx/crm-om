@@ -56,7 +56,9 @@ const structuralRequirements = [
   ["app/layout.tsx", ["getPlatformBranding", "generateMetadata", "branding.productName"]],
   ["components/brand-logo.tsx", ["branding.productName", "branding.logoUrl"]],
   ["components/app-sidebar.tsx", ["BrandLogo"]],
-  ["app/login/page.tsx", ["getPlatformBranding", "BrandLogo"]],
+  // The legacy /login route intentionally redirects to the centrally branded public root.
+  ["app/login/page.tsx", ['redirect("/")']],
+  ["app/page.tsx", ["getPlatformBranding", "BrandLogo"]],
   ["app/loading.tsx", ["getPlatformBranding", "BrandLogo"]],
   ["lib/branding/messages.ts", ["getPlatformBranding", "buildSystemEmail", "buildSystemNotification"]],
   ["lib/messaging/resend.ts", ["buildSystemEmail", "RESEND_API_KEY"]],
