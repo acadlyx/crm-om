@@ -218,6 +218,28 @@ export async function PATCH(request: Request, context: { params: Promise<{ resou
       return Response.json({ data: result.invoice, idempotentReplay: result.kind === "EXISTING" }, { status: result.kind === "EXISTING" ? 200 : 201 });
     }
 
+    if (resource === "sales-orders" && (body.status === "CONFIRMED" || body.status === "CANCELLED")) {
+      const parsed = z.object({ status: z.enum(["CONFIRMED", "CANCELLED"]) }).strict().safeParse(body);
+      if (!parsed.success) return fail("Invalid sales-order status transition.");
+      const result = await db.$transaction(async (tx) => {
+        const order = await tx.salesOrder.findFirst({
+          where: { id, tenantId },
+          include: { invoices: { select: { id: true } } },
+        });
+        if (!order) return { kind: "NOT_FOUND" as const };
+        if (order.status === "CANCELLED" || order.status === "DELIVERED") return { kind: "INVALID_STATE" as const };
+        if (parsed.data.status === "CONFIRMED" && order.status !== "DRAFT") return { kind: "INVALID_STATE" as const };
+        if (parsed.data.status === "CANCELLED" && order.invoices.length) return { kind: "INVOICED" as const };
+        const updated = await tx.salesOrder.update({ where: { id: order.id }, data: { status: parsed.data.status } });
+        await audit(tx, actorId, "SALES_ORDER_STATUS_CHANGED", "SalesOrder", order.id, { from: order.status, to: parsed.data.status });
+        return { kind: "UPDATED" as const, order: updated };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      if (result.kind === "NOT_FOUND") return fail("Sales order not found in this workspace.", 404);
+      if (result.kind === "INVOICED") return fail("An order with an issued invoice cannot be cancelled. Reverse or credit the invoice using an authorized financial workflow.", 409);
+      if (result.kind === "INVALID_STATE") return fail("This order cannot make that status transition.", 409);
+      return Response.json({ data: result.order });
+    }
+
     if (resource === "sales-orders") {
       const parsed = z.object({ status: z.enum(["CONFIRMED", "CANCELLED"]) }).strict().safeParse(body);
       if (!parsed.success) return fail("Choose CONFIRMED or CANCELLED.");
