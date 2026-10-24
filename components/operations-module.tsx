@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   AlertCircle, ArrowDownToLine, ArrowRight, CheckCircle2, LoaderCircle,
-  Plus, RefreshCw, Search, ShieldCheck, X,
+  Plus, RefreshCw, Search, X,
 } from "lucide-react";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- One API component renders several resource-specific Prisma payloads; every write is validated server-side.
 type Row = Record<string, any> & { id: string };
 type Catalogs = {
   customers: Row[]; invoices: Row[]; products: Row[]; suppliers: Row[];
@@ -75,10 +76,11 @@ const moduleConfig: Record<string, { title: string; description: string; columns
 };
 
 function readKey(row: Row, path: string): unknown {
-  return path.split(".").reduce((value: any, part) => {
+  return path.split(".").reduce<unknown>((value, part) => {
     if (part === "length" && Array.isArray(value)) return value.length;
-    return value == null ? undefined : value[part];
-  }, row);
+    if (value === null || value === undefined || typeof value !== "object") return undefined;
+    return (value as Record<string, unknown>)[part];
+  }, row as unknown);
 }
 function showValue(value: unknown, key: string) {
   if (value === null || value === undefined || value === "") return "—";
@@ -119,8 +121,6 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
   const [selectedOrderId, setSelectedOrderId] = useState("");
 
   const loadRows = useCallback(async () => {
-    setLoading(true);
-    setError("");
     try {
       const response = await fetch("/api/v1/operations/" + resource, { cache: "no-store" });
       const result = await response.json();
@@ -400,7 +400,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
       <header className="crm-module-heading">
         <div><p className="dashboard-eyebrow">BUSINESS OPERATIONS</p><h1>{config.title}</h1><p className="dashboard-subtitle">{config.description}</p></div>
         <div className="operations-heading-actions">
-          <button type="button" className="crm-secondary-button" onClick={() => { void loadRows(); void loadCatalogs(); }} disabled={loading}><RefreshCw size={15} />Refresh</button>
+          <button type="button" className="crm-secondary-button" onClick={() => { setLoading(true); setError(""); void loadRows(); void loadCatalogs(); }} disabled={loading}><RefreshCw size={15} />Refresh</button>
           {config.writable && <button type="button" className="brand-button crm-add-button" onClick={() => { setFormOpen((value) => !value); setError(""); setNotice(""); }}><Plus size={16} />{formOpen ? "Close form" : "Add new"}</button>}
         </div>
       </header>
@@ -442,7 +442,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
               {!editingOrder && <SelectField name="status" label="Initial status" options={[{ value: "DRAFT", label: "Draft" }, { value: "CONFIRMED", label: "Confirmed" }]} defaultValue="DRAFT" />}
               <TextField name="notes" label="Order notes" placeholder="Optional notes" defaultValue={editingOrder?.notes || ""} />
             </div>
-            <LineEditor title="Order items" lines={orderLines} setLines={setOrderLines} onEmpty={() => setOrderLines((items) => [...items, { productId: "", quantity: "1", discountPercent: "0", taxPercent: "0" }])} productOptions={productOptions} mode="sales" />
+            <LineEditor title="Order items" lines={orderLines} setLines={setOrderLines} productOptions={productOptions} mode="sales" />
           </>}
           {resource === "purchase-orders" && <>
             <div className="operations-form-grid">
@@ -451,7 +451,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
               <TextField name="expectedAt" label="Expected receipt date" type="date" />
               <TextField name="notes" label="Purchase notes" />
             </div>
-            <LineEditor title="Purchase items" lines={purchaseLines} setLines={setPurchaseLines} onEmpty={() => setPurchaseLines((items) => [...items, { productId: "", quantity: "1" }])} productOptions={productOptions} mode="purchase" />
+            <LineEditor title="Purchase items" lines={purchaseLines} setLines={setPurchaseLines} productOptions={productOptions} mode="purchase" />
             <p className="owner-footnote">Unit purchase costs come from the saved product cost, not from a client-supplied total. Create a goods receipt after items physically arrive.</p>
           </>}
           {resource === "goods-receipts" && <>
@@ -483,7 +483,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
               <TextField name="notes" label="Receipt notes" />
             </div>
             <AllocationEditor lines={allocations} setLines={setAllocations} options={invoiceOptions} label="Allocate to invoices" keyName="invoiceId" />
-            <p className="owner-footnote">The total posted receipt is counted once as a collection. Invoice allocations must not exceed the actual receipt or each invoice's outstanding balance.</p>
+            <p className="owner-footnote">The total posted receipt is counted once as a collection. Invoice allocations must not exceed the actual receipt or each invoice&apos;s outstanding balance.</p>
           </>}
           {resource === "supplier-bills" && <>
             <div className="operations-form-grid">
@@ -588,9 +588,9 @@ function SelectField({ name, label, required, defaultValue, options, placeholder
   return <label className="field"><span>{label}</span><select name={name} required={required} defaultValue={defaultValue ?? ""}><option value="">{placeholder || "Select an option"}</option>{options.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>;
 }
 type SalesLine = { productId: string; quantity: string; discountPercent?: string; taxPercent?: string };
-function LineEditor({ title, lines, setLines, productOptions, mode, onEmpty }: {
+function LineEditor({ title, lines, setLines, productOptions, mode }: {
   title: string; lines: SalesLine[]; setLines: (lines: SalesLine[]) => void; productOptions: Array<{value:string;label:string}>;
-  mode: "sales" | "purchase"; onEmpty?: () => void;
+  mode: "sales" | "purchase";
 }) {
   return <div className="operations-lines"><div className="operations-lines-heading"><strong>{title}</strong><button type="button" className="crm-secondary-button" onClick={() => setLines([...lines, mode === "sales" ? { productId: "", quantity: "1", discountPercent: "0", taxPercent: "0" } : { productId: "", quantity: "1" }])}><Plus size={14} />Add line</button></div>
     {lines.map((line,index) => <div className="operations-line-row" key={index}>
