@@ -1,0 +1,119 @@
+.workspace-shell { min-height: 100vh; display: flex; width: 100%; }
+.workspace-shell .sidebar-slot { width: 250px; min-width: 0; flex: 0 0 250px; }
+.workspace-shell .mobile-shell-header { display: none; }
+.workspace-shell .mobile-nav-backdrop { display: none; }
+.workspace-shell .mobile-shell-toggle { display: none; }
+
+@media (max-width: 760px) {
+  .workspace-shell { display: flex; flex-direction: column; width: 100%; min-width: 0; }
+  .workspace-shell .mobile-shell-header {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 80;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 66px;
+    padding: 9px 14px;
+    background: #fff;
+    border-bottom: 1px solid #e8ebf0;
+  }
+  .workspace-shell .mobile-shell-brand { overflow: hidden; max-width: calc(100% - 54px); color: #25334a; font-size: 15px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+  .workspace-shell .mobile-shell-toggle {
+    display: grid;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    border: 1px solid #e1e6ee;
+    border-radius: 11px;
+    background: #fff;
+    color: #263750;
+    cursor: pointer;
+  }
+  .workspace-shell .mobile-shell-toggle:focus-visible { outline: 3px solid #b8cbff; outline-offset: 2px; }
+  .workspace-shell .mobile-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 66px 0 0;
+    z-index: 70;
+    width: 100%;
+    height: calc(100dvh - 66px);
+    padding: 0;
+    border: 0;
+    background: rgb(15 23 42 / 42%);
+  }
+  .workspace-shell .sidebar-slot { position: static; width: 0; height: 0; min-width: 0; flex: 0 0 0; }
+  .workspace-shell .sidebar-slot .sidebar {
+    position: fixed !important;
+    z-index: 71;
+    top: 66px;
+    bottom: 0;
+    left: 0;
+    width: min(84vw, 310px);
+    max-width: calc(100vw - 38px);
+    height: auto;
+    max-height: none;
+    padding: 18px 12px max(20px, env(safe-area-inset-bottom));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-right: 1px solid #e8ebf0;
+    border-bottom: 0;
+    background: #fff;
+    box-shadow: 0 15px 45px rgb(21 34 56 / 14%);
+    transform: translateX(-105%);
+    visibility: hidden;
+    transition: transform .2s ease, visibility .2s ease;
+  }
+  .workspace-shell.mobile-nav-open .sidebar-slot .sidebar { transform: translateX(0); visibility: visible; }
+  .workspace-shell .sidebar-nav { margin-top: 0; }
+  .workspace-shell .main-content { width: 100%; min-width: 0; padding: 18px 14px calc(28px + env(safe-area-inset-bottom)); }
+  .workspace-shell .main-content > *, .workspace-shell .dashboard-page > *, .workspace-shell .owner-dashboard > *,
+  .workspace-shell .workspace-admin-page > *, .workspace-shell .crm-module-page > * { min-width: 0; max-width: 100%; }
+  .workspace-shell .card, .workspace-shell .workspace-admin-card, .workspace-shell .workspace-list-card { min-width: 0; padding: 18px; }
+  .workspace-shell .workspace-form-grid, .workspace-shell .crm-form-grid, .workspace-shell .operations-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .workspace-shell .workspace-form-wide, .workspace-shell .crm-field-wide { grid-column: 1; }
+  .workspace-shell .field, .workspace-shell .field input, .workspace-shell .field select, .workspace-shell .field textarea { min-width: 0; max-width: 100%; }
+  .workspace-shell .crm-module-heading, .workspace-shell .owner-header { align-items: stretch; flex-direction: column; gap: 12px; }
+  .workspace-shell .crm-module-heading h1, .workspace-shell .owner-header h1 { overflow-wrap: anywhere; }
+  .workspace-shell .operations-heading-actions { width: 100%; flex-wrap: wrap; }
+  .workspace-shell .operations-heading-actions > button { min-height: 40px; }
+  .workspace-shell .crm-table-toolbar { align-items: stretch; flex-direction: column; gap: 12px; }
+  .workspace-shell .crm-table-toolbar-actions, .workspace-shell .operations-table-actions { display: flex; width: 100%; min-width: 0; flex-wrap: wrap; gap: 8px; }
+  .workspace-shell .crm-search, .workspace-shell .operations-table-actions .crm-search { width: 100%; min-width: 0; max-width: none; }
+  .workspace-shell .workspace-table-wrap, .workspace-shell .crm-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .workspace-shell .workspace-table, .workspace-shell .crm-table { min-width: 680px; }
+  .workspace-shell .operations-table { min-width: 850px; }
+  .workspace-shell .owner-kpis, .workspace-shell .dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .workspace-shell .owner-stacked-panels { grid-template-columns: minmax(0, 1fr); }
+  .workspace-shell .owner-stacked-panels > article:last-child { grid-column: auto; }
+  .workspace-shell .owner-date-filters { display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .workspace-shell .owner-date-filters label { min-width: 0; }
+  .workspace-shell .owner-date-filters label input, .workspace-shell .owner-date-filters label select { width: 100%; max-width: 100%; }
+  .workspace-shell .owner-filter-card { align-items: stretch; flex-direction: column; }
+  .workspace-shell .dashboard-heading { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .workspace-shell .dashboard-summary-row { min-width: 0; align-items: flex-start; }
+  .workspace-shell .dashboard-summary-row > div, .workspace-shell .dashboard-action-copy { overflow-wrap: anywhere; }
+  .workspace-shell .dashboard-panel, .workspace-shell .owner-panel, .workspace-shell .owner-filter-card, .workspace-shell .owner-system-notice { min-width: 0; max-width: 100%; }
+  .workspace-shell .owner-system-notice { align-items: flex-start; }
+  .workspace-shell .owner-system-notice p, .workspace-shell .owner-system-notice small { overflow-wrap: anywhere; }
+  .workspace-shell .crm-form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .workspace-shell .crm-form-actions > button { flex: 1 1 auto; min-height: 40px; }
+  .workspace-shell .workspace-submit, .workspace-shell .brand-button, .workspace-shell .crm-secondary-button { min-height: 40px; }
+  .workspace-shell .dashboard-content-grid, .workspace-shell .dashboard-lower-grid { grid-template-columns: minmax(0, 1fr); }
+  .workspace-shell .owner-chart, .workspace-shell .owner-chart-wrap, .workspace-shell .owner-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; }
+  .workspace-shell .owner-table-wrap table { min-width: 640px; }
+}
+@media (max-width: 420px) {
+  .workspace-shell .main-content { padding: 14px 10px calc(24px + env(safe-area-inset-bottom)); }
+  .workspace-shell .card, .workspace-shell .workspace-admin-card, .workspace-shell .workspace-list-card { padding: 14px; border-radius: 13px; }
+  .workspace-shell .owner-kpis, .workspace-shell .dashboard-metrics, .workspace-shell .owner-date-filters { grid-template-columns: minmax(0, 1fr); }
+  .workspace-shell .dashboard-metric-label { min-height: 0; }
+  .workspace-shell .dashboard-heading h1, .workspace-shell .crm-module-heading h1, .workspace-shell .owner-header h1 { font-size: 26px; }
+  .workspace-shell .operations-heading-actions > button { flex: 1 1 auto; justify-content: center; }
+  .workspace-shell .crm-form-actions > button, .workspace-shell .workspace-submit { width: 100%; }
+  .workspace-shell .mobile-shell-header { padding-inline: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .workspace-shell .sidebar { transition: none; } }

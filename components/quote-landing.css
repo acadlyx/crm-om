@@ -1,0 +1,258 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,500;1,600&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+.quote-landing {
+  --paper: #f1e9dc;
+  --ink: #292b27;
+  --accent: #8d4638;
+  --display: "Playfair Display", "Iowan Old Style", Georgia, serif;
+  --body: "DM Sans", sans-serif;
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  width: 100%;
+  min-height: 100svh;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  transition: background-color .65s ease, color .45s ease;
+}
+.quote-canvas {
+  appearance: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 100svh;
+  padding: clamp(26px, 8vw, 104px);
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: center;
+  cursor: pointer;
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
+}
+.quote-canvas:focus-visible { outline: 2px solid currentColor; outline-offset: -12px; }
+.quote-text {
+  position: relative;
+  z-index: 2;
+  display: block;
+  max-width: 12ch;
+  white-space: pre-line;
+  font-family: var(--display);
+  font-size: clamp(2.75rem, 8.4vw, 8.8rem);
+  font-weight: 500;
+  line-height: .99;
+  letter-spacing: -.055em;
+  text-wrap: balance;
+  animation: quote-arrive .7s cubic-bezier(.2,.75,.25,1) both;
+}
+.quote-decoration {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity .65s ease, transform .85s cubic-bezier(.2,.7,.2,1), border-radius .8s ease;
+}
+.design-paper {
+  --paper: #f0e8da;
+  --ink: #30342d;
+  --accent: #8b4e3b;
+  --display: "Playfair Display", "Iowan Old Style", Georgia, serif;
+  background-color: var(--paper);
+  background-image: radial-gradient(#7b6450 0.45px, transparent .55px);
+  background-size: 7px 7px;
+}
+.design-paper .quote-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 26px;
+  border: 1px solid rgb(75 63 51 / 22%);
+  pointer-events: none;
+}
+.design-paper .quote-text { max-width: 11ch; font-size: clamp(3rem, 8.8vw, 9.2rem); }
+.design-paper .quote-decoration {
+  inset: 50% auto auto 50%;
+  width: min(68vw, 700px);
+  height: min(68vw, 700px);
+  border: 1px solid rgb(139 78 59 / 24%);
+  border-radius: 50%;
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(.84);
+}
+.design-atelier {
+  --paper: #152d49;
+  --ink: #f0e9da;
+  --accent: #efb987;
+  --display: "Playfair Display", Georgia, serif;
+  background: var(--paper);
+}
+.design-atelier .quote-canvas { text-align: left; place-items: center start; }
+.design-atelier .quote-canvas::before {
+  content: " ";
+  position: absolute;
+  width: 1px;
+  inset: 10% auto 10% 13%;
+  background: rgb(240 233 218 / 25%);
+}
+.design-atelier .quote-text {
+  max-width: 10ch;
+  margin-left: clamp(26px, 7vw, 110px);
+  font-size: clamp(3.8rem, 10vw, 10rem);
+  font-weight: 500;
+  line-height: .9;
+  letter-spacing: -.07em;
+}
+.design-atelier .quote-decoration {
+  inset: auto -12vw -25vw auto;
+  width: 55vw;
+  height: 55vw;
+  border: 1px solid rgb(239 185 135 / 45%);
+  border-radius: 50%;
+  opacity: 1;
+}
+.design-citrus {
+  --paper: #d8f24a;
+  --ink: #20251d;
+  --accent: #20251d;
+  --display: "Space Grotesk", Impact, sans-serif;
+  background: var(--paper);
+}
+.design-citrus .quote-canvas { text-align: left; place-items: center start; }
+.design-citrus .quote-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 56%;
+  width: 44%;
+  background: #f7f1df;
+  transform: skewX(-10deg) translateX(10%);
+}
+.design-citrus .quote-text {
+  max-width: 9ch;
+  font-family: var(--display);
+  font-size: clamp(3.6rem, 10.6vw, 10.8rem);
+  font-weight: 700;
+  line-height: .86;
+  letter-spacing: -.09em;
+  text-transform: uppercase;
+}
+.design-citrus .quote-decoration {
+  inset: auto 7% 8% auto;
+  width: clamp(70px, 14vw, 190px);
+  height: clamp(70px, 14vw, 190px);
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  opacity: 1;
+  transform: rotate(-18deg);
+}
+.design-midnight {
+  --paper: #171516;
+  --ink: #f4c6cb;
+  --accent: #f4c6cb;
+  --display: "DM Sans", sans-serif;
+  background: var(--paper);
+}
+.design-midnight .quote-canvas { text-align: center; }
+.design-midnight .quote-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 8% 9%;
+  border: 1px solid rgb(244 198 203 / 32%);
+  transform: rotate(-4deg);
+}
+.design-midnight .quote-text {
+  max-width: 10ch;
+  font-family: var(--display);
+  font-size: clamp(3.2rem, 9.2vw, 9.4rem);
+  line-height: .93;
+  font-weight: 500;
+  letter-spacing: -.075em;
+}
+.design-midnight .quote-decoration {
+  inset: 50% auto auto 50%;
+  width: min(64vw, 620px);
+  height: min(64vw, 620px);
+  border: 1px solid rgb(244 198 203 / 23%);
+  border-radius: 50%;
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.2);
+}
+.design-rose {
+  --paper: #f2c9bc;
+  --ink: #6a282c;
+  --accent: #a3484b;
+  --display: "Playfair Display", Georgia, serif;
+  background: var(--paper);
+  background-image: linear-gradient(135deg, rgb(255 255 255 / 20%), transparent 55%);
+}
+.design-rose .quote-canvas { place-items: center; text-align: right; }
+.design-rose .quote-text {
+  max-width: 10ch;
+  margin-left: 10%;
+  font-size: clamp(3.25rem, 9.1vw, 9.5rem);
+  font-style: italic;
+  font-weight: 500;
+  line-height: .96;
+  letter-spacing: -.065em;
+}
+.design-rose .quote-decoration {
+  inset: -20% auto auto -12%;
+  width: 62vw;
+  height: 62vw;
+  border-radius: 50%;
+  background: rgb(163 72 75 / 12%);
+  opacity: 1;
+}
+.design-gallery {
+  --paper: #e9e8e2;
+  --ink: #1d3834;
+  --accent: #1d3834;
+  --display: "DM Mono", monospace;
+  background: var(--paper);
+}
+.design-gallery .quote-canvas {
+  place-items: end start;
+  text-align: left;
+  padding: clamp(28px, 8vw, 120px);
+}
+.design-gallery .quote-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 7% 7% 7% auto;
+  width: 32%;
+  background: #d7d4ca;
+}
+.design-gallery .quote-text {
+  max-width: 11ch;
+  font-family: var(--display);
+  font-size: clamp(2.35rem, 6.5vw, 6.8rem);
+  line-height: 1.12;
+  letter-spacing: -.08em;
+}
+.design-gallery .quote-decoration {
+  inset: 15% 13% auto auto;
+  width: 19vw;
+  height: 19vw;
+  border: 1px solid rgb(29 56 52 / 50%);
+  opacity: 1;
+  transform: rotate(45deg);
+}
+@keyframes quote-arrive {
+  from { opacity: 0; transform: translateY(16px); filter: blur(5px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+@media (max-width: 600px) {
+  .quote-canvas { padding: 28px; }
+  .quote-canvas::before { inset: 13px !important; }
+  .quote-text { font-size: clamp(2.6rem, 12.5vw, 5.4rem) !important; }
+  .design-atelier .quote-text { margin-left: 20px; max-width: 9ch; }
+  .design-citrus .quote-canvas::before { inset: 0 0 0 49% !important; }
+  .design-rose .quote-text { margin-left: 2%; }
+  .design-gallery .quote-canvas { padding: 28px; }
+  .design-gallery .quote-canvas::before { inset: 7% 7% 7% auto !important; width: 27%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .quote-landing, .quote-text, .quote-decoration { animation: none !important; transition: none !important; }
+}
