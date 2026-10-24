@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { CheckCircle2, CircleAlert, LoaderCircle, Plus, RefreshCw, Search, ShieldCheck, UserCheck, UserMinus, Users, X } from "lucide-react";
 import { PasswordInput } from "@/components/password-input";
@@ -35,8 +36,6 @@ export function TeamModule() {
   const [notice, setNotice] = useState("");
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
     try {
       const response = await fetch("/api/v1/operations/team?includeInactive=true", { cache: "no-store" });
       const result = await response.json();
@@ -100,7 +99,7 @@ export function TeamModule() {
       <header className="crm-module-heading">
         <div><p className="dashboard-eyebrow">OWNER CONTROLS</p><h1>Team & permissions</h1><p className="dashboard-subtitle">Create staff accounts, assign least-privilege roles, and deactivate access when required.</p></div>
         <div className="operations-heading-actions">
-          <button type="button" className="crm-secondary-button" onClick={() => void load()} disabled={loading}><RefreshCw size={15} />Refresh</button>
+          <button type="button" className="crm-secondary-button" onClick={() => { setLoading(true); setError(""); void load(); }} disabled={loading}><RefreshCw size={15} />Refresh</button>
           <button type="button" className="brand-button crm-add-button" onClick={() => { setOpen(!open); setError(""); setNotice(""); }}><Plus size={16} />{open ? "Close form" : "Add team member"}</button>
         </div>
       </header>
@@ -151,7 +150,7 @@ export function TeamModule() {
 
       <section className="owner-two-col">
         <article className="card owner-panel"><div className="owner-panel-heading"><div><p className="dashboard-eyebrow">ROLE CAPABILITIES</p><h2>Starter role defaults</h2></div></div><div className="owner-rank-list">{roles.map((item) => <div className="owner-rank-row" key={item.value}><span className="owner-rank-index"><ShieldCheck size={14}/></span><div><strong>{item.label}</strong><small>{item.description}</small></div></div>)}</div></article>
-        <article className="card owner-panel"><div className="owner-panel-heading"><div><p className="dashboard-eyebrow">PERMISSION OVERRIDES</p><h2>Fine-grained control</h2></div></div><p className="dashboard-subtitle">Use the permissions screen to override a module/action grant for a role within this workspace. Overrides are enforced in server API handlers; hidden navigation alone is not used as a security boundary.</p><a className="dashboard-text-link" href="/operations/permissions">Configure permissions <ShieldCheck size={15}/></a><p className="owner-footnote">The owner account remains the authority for team access. Staff cannot add users, assign owner roles, or grant their own permissions.</p></article>
+        <article className="card owner-panel"><div className="owner-panel-heading"><div><p className="dashboard-eyebrow">PERMISSION OVERRIDES</p><h2>Fine-grained control</h2></div></div><p className="dashboard-subtitle">Use the permissions screen to override a module/action grant for a role within this workspace. Overrides are enforced in server API handlers; hidden navigation alone is not used as a security boundary.</p><Link className="dashboard-text-link" href="/operations/permissions">Configure permissions <ShieldCheck size={15}/></Link><p className="owner-footnote">The owner account remains the authority for team access. Staff cannot add users, assign owner roles, or grant their own permissions.</p></article>
       </section>
     </div>
   );
