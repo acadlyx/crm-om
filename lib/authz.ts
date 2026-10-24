@@ -30,6 +30,7 @@ export async function requireTenantUser() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return { ok: false as const, status: 401, user: null };
   const user = await db.user.findUnique({ where: { email: session.user.email } });
-  if (!user || !canManageTenantSettings(user.role, user.tenantId)) return { ok: false as const, status: 403, user: null };
+  if (!user || !user.isActive) return { ok: false as const, status: 401, user: null };
+  if (!canManageTenantSettings(user.role, user.tenantId)) return { ok: false as const, status: 403, user: null };
   return { ok: true as const, user };
 }
