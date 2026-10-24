@@ -47,7 +47,7 @@ export default async function DashboardPage() {
 
   const isPlatformAdmin = session.user.role === "PLATFORM_ADMIN";
   const tenantId = session.user.tenantId;
-  const activityWhere = isPlatformAdmin ? {} : { actorUserId: session.user.id };
+  const activityWhere = isPlatformAdmin && !tenantId ? {} : { actorUserId: session.user.id };
 
   const [
     brand,
