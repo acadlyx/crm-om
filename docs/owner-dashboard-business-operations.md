@@ -55,7 +55,7 @@ The following require additional configuration or implementation before calling 
 - The default inventory costing behavior is weighted-average purchase cost. FIFO/LIFO layers are not implemented; do not switch the setting to another method and assume those methods are honored.
 - Full bank/cash reconciliation and a complete double-entry chart-of-accounts/cashflow model are not present. The ledger captures customer/supplier transaction movements and reversals, not a substitute for a reconciled general ledger.
 - Sales returns, credit notes, warranty claims and supplier returns need dedicated approval/quantity/financial workflows. Damage/loss/return stock movement types and reversal-safe posted receipts cover stock adjustments, not every return lifecycle.
-- Customer-specific product price lists, automated credit-control policy, delivery proof upload/storage and invitation emails need business-policy and provider work before activation.
+- Customer-specific product price lists, delivery proof upload/storage and invitation emails need business-policy and provider work before activation. Customer address, payment terms and positive credit limits are stored; issuing an invoice on credit terms checks current exposure against the configured limit.
 - Production backup/restore and recovery have not been verified by this change.
 
 No production migration has been run as part of this branch.
