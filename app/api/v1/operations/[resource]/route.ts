@@ -157,7 +157,7 @@ async function rowsFor(resource: string, tenantId: string) {
     case "sales-orders":
       return db.salesOrder.findMany({ where: { tenantId }, orderBy: { createdAt: "desc" }, take: 300, include: {
         customer: { select: { id: true, name: true, company: true } },
-        items: { include: { product: { select: { id: true, sku: true, name: true } } } },
+        items: { include: { product: { select: { id: true, sku: true, name: true, unit: true } } } },
         deliveries: {
           select: {
             id: true, deliveryNumber: true, status: true,
@@ -168,35 +168,36 @@ async function rowsFor(resource: string, tenantId: string) {
       } });
     case "purchase-orders":
       return db.purchaseOrder.findMany({ where: { tenantId }, orderBy: { createdAt: "desc" }, take: 300, include: {
-        supplier: { select: { id: true, name: true, company: true } },
-        items: { include: { product: { select: { id: true, sku: true, name: true } } } },
+        supplier: { select: { id: true, name: true, company: true, email: true, phone: true, taxId: true } },
+        items: { include: { product: { select: { id: true, sku: true, name: true, unit: true } } } },
         receipts: { select: { id: true, receiptNumber: true, status: true, receivedAt: true } },
       } });
     case "goods-receipts":
       return db.goodsReceipt.findMany({ where: { tenantId }, orderBy: { receivedAt: "desc" }, take: 300, include: {
-        purchaseOrder: { select: { orderNumber: true, supplier: { select: { name: true } } } },
-        items: { include: { product: { select: { sku: true, name: true } } } },
+        purchaseOrder: { select: { orderNumber: true, supplier: { select: { name: true, company: true, email: true, phone: true } } } },
+        items: { include: { product: { select: { sku: true, name: true, unit: true } } } },
       } });
     case "deliveries":
       return db.delivery.findMany({ where: { tenantId }, orderBy: { createdAt: "desc" }, take: 300, include: {
-        order: { select: { orderNumber: true, customer: { select: { name: true } } } },
+        order: { select: { orderNumber: true, customer: { select: { name: true, company: true, email: true, phone: true } } } },
         assignedUser: { select: { name: true, email: true } },
         items: { include: { product: { select: { sku: true, name: true } } } },
       } });
     case "customer-receipts":
       return db.customerReceipt.findMany({ where: { tenantId }, orderBy: { receivedAt: "desc" }, take: 300, include: {
-        customer: { select: { name: true } },
-        allocations: { include: { invoice: { select: { invoiceNumber: true } } } },
+        customer: { select: { id: true, name: true, company: true, email: true, phone: true } },
+        allocations: { include: { invoice: { select: { invoiceNumber: true, total: true, status: true, customer: { select: { name: true } } } } } },
       } });
     case "supplier-bills":
       return db.supplierBill.findMany({ where: { tenantId }, orderBy: { dueDate: "asc" }, take: 300, include: {
-        supplier: { select: { name: true } },
-        allocations: { include: { payment: { select: { amount: true, status: true } } } },
+        supplier: { select: { id: true, name: true, company: true, email: true, phone: true, taxId: true } },
+        purchaseOrder: { select: { orderNumber: true } },
+        allocations: { include: { payment: { select: { amount: true, status: true, reference: true, paidAt: true } } } },
       } });
     case "supplier-payments":
       return db.supplierPayment.findMany({ where: { tenantId }, orderBy: { paidAt: "desc" }, take: 300, include: {
-        supplier: { select: { name: true } },
-        allocations: { include: { bill: { select: { billNumber: true } } } },
+        supplier: { select: { id: true, name: true, company: true, email: true, phone: true, taxId: true } },
+        allocations: { include: { bill: { select: { billNumber: true, total: true, dueDate: true, status: true } } } },
       } });
     case "inventory":
       return db.inventoryMovement.findMany({ where: { tenantId }, orderBy: { createdAt: "desc" }, take: 300, include: {
@@ -204,11 +205,12 @@ async function rowsFor(resource: string, tenantId: string) {
       } });
     case "customer-follow-ups":
       return db.customerFollowUp.findMany({ where: { tenantId }, orderBy: [{ status: "asc" }, { dueAt: "asc" }], take: 300, include: {
-        customer: { select: { name: true } },
+        customer: { select: { id: true, name: true, company: true, email: true, phone: true } },
+        assignedUser: { select: { id: true, name: true, email: true } },
       } });
     case "ledger":
       return db.ledgerEntry.findMany({ where: { tenantId }, orderBy: { postedAt: "desc" }, take: 300, include: {
-        customer: { select: { name: true } }, supplier: { select: { name: true } },
+        customer: { select: { name: true, company: true } }, supplier: { select: { name: true, company: true } },
       } });
     case "permissions":
       return db.rolePermission.findMany({ where: { tenantId }, orderBy: [{ role: "asc" }, { moduleKey: "asc" }, { actionKey: "asc" }], take: 500 });
