@@ -2,12 +2,13 @@ import { redirect, notFound } from "next/navigation";
 import { requireWorkspaceAccess } from "@/lib/crm/access";
 import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { OperationsModule } from "@/components/operations-module";
+import { UpiCollectionsModule } from "@/components/upi-collections-module";
 
 export const dynamic = "force-dynamic";
 
 const sections = new Set([
   "products", "suppliers", "sales-orders", "purchase-orders", "goods-receipts",
-  "deliveries", "customer-receipts", "supplier-bills", "supplier-payments",
+  "deliveries", "customer-receipts", "supplier-bills", "supplier-payments", "upi-collections",
   "inventory", "customer-follow-ups", "ledger", "permissions",
 ]);
 
@@ -31,5 +32,7 @@ export default async function OperationsPage({ params }: { params: Promise<{ sec
 
   const owner = access.user.role === "TENANT_ADMIN" || access.user.role === "PLATFORM_ADMIN";
   const updatePermission = await requireWorkspacePermission(access, section, "update");
-  return <OperationsModule resource={section} owner={owner} canUpdate={updatePermission.ok} />;
+  const deletePermission = await requireWorkspacePermission(access, section, "delete");
+  if (section === "upi-collections") return <UpiCollectionsModule canDelete={deletePermission.ok} />;
+  return <OperationsModule resource={section} owner={owner} canUpdate={updatePermission.ok} canDelete={deletePermission.ok} />;
 }
