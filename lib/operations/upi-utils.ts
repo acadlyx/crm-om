@@ -84,5 +84,6 @@ export function invoiceOutstandingBalance(item: Record<string, unknown>): number
 }
 
 export function safeUpiFilename(value: string): string {
-  return value.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 60) || "upi-qr";
+  const safe = value.replace(/[\\/\\\\\\s]+/g, "-").replace(/[^a-zA-Z0-9_-]/g, "-").replace(/\\.{2,}/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+  return safe || "upi-qr";
 }
