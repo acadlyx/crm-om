@@ -784,7 +784,7 @@ function Cell({ row, column }: { row: Row; column: Column }) {
     const state = String(value || "unknown").toLowerCase();
     return <span className={"crm-pill " + (["paid","posted","delivered","received","active","confirmed","partially_delivered","partially_received"].includes(state) ? "crm-pill-active" : ["cancelled","reversed","failed","inactive","loss","damage"].includes(state) ? "crm-pill-overdue" : "")}>{titleCase(String(value || "Unknown"))}</span>;
   }
-  if (column.key === "notes" && value) return <span title={String(value)}>{String(value).slice(0,80)}{String(value).length>80?"…":""}</span>;
+  if (column.key === "notes" && value) return <span title={String(value)} style={{ display: "block", whiteSpace: "pre-wrap", overflowWrap: "anywhere", minWidth: 180, maxWidth: 360 }}>{String(value)}</span>;
   return <span>{showValue(value, column.key)}</span>;
 }
 
