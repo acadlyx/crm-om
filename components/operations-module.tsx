@@ -102,36 +102,37 @@ function showValue(value: unknown, key: string): string {
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (Array.isArray(value)) {
     if (!value.length) return "—";
-    return value.map((entry) => {
-      if (!entry || typeof entry !== "object") return String(entry ?? "");
-      const item = entry as Record<string, unknown>;
-      const product = item.product && typeof item.product === "object" ? item.product as Record<string, unknown> : {};
-      const orderItem = item.orderItem && typeof item.orderItem === "object" ? item.orderItem as Record<string, unknown> : {};
-      const invoice = item.invoice && typeof item.invoice === "object" ? item.invoice as Record<string, unknown> : {};
-      const bill = item.bill && typeof item.bill === "object" ? item.bill as Record<string, unknown> : {};
-      const payment = item.payment && typeof item.payment === "object" ? item.payment as Record<string, unknown> : {};
-      const parts = [
-        item.sku || product.sku ? String(item.sku || product.sku) : "",
-        item.name || product.name ? String(item.name || product.name) : "",
-        item.quantity != null ? "qty " + String(item.quantity) : "",
-        item.unitPrice != null || orderItem.unitPrice != null ? "unit price " + String(item.unitPrice ?? orderItem.unitPrice) : "",
-        item.discountAmount != null || orderItem.discountAmount != null ? "discount " + String(item.discountAmount ?? orderItem.discountAmount) : "",
-        item.taxAmount != null || orderItem.taxAmount != null ? "tax " + String(item.taxAmount ?? orderItem.taxAmount) : "",
-        invoice.invoiceNumber ? "invoice " + String(invoice.invoiceNumber) : "",
-        bill.billNumber ? "bill " + String(bill.billNumber) : "",
-        payment.reference ? "UTR " + String(payment.reference) : "",
-        payment.paidAt ? "paid " + showValue(payment.paidAt, "paidAt") : "",
-        item.amount != null ? "amount " + new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(item.amount)) : "",
-        item.status ? "status " + titleCase(String(item.status)) : "",
-        item.deliveryNumber ? "delivery " + String(item.deliveryNumber) : "",
-        item.receiptNumber ? "receipt " + String(item.receiptNumber) : "",
-        item.invoiceNumber ? "invoice " + String(item.invoiceNumber) : "",
-        item.orderNumber ? "order " + String(item.orderNumber) : "",
-      ].filter(Boolean);
-      return parts.length ? parts.join(" · ") : Object.entries(item)
-        .filter(([, v]) => v == null || ["string", "number", "boolean"].includes(typeof v))
-        .map(([k, v]) => k + ": " + String(v ?? "—")).join(", ");
-    }).join(" | ");
+    const summarize = (entry: unknown, depth = 0): string => {
+      if (entry === null || entry === undefined) return "";
+      if (typeof entry !== "object" || Array.isArray(entry)) return String(entry);
+      const record = entry as Record<string, unknown>;
+      const omit = new Set(["id", "tenantId", "tenant_id", "createdByUserId", "updatedByUserId", "idempotencyKey", "passwordHash"]);
+      const parts: string[] = [];
+      for (const [name, nested] of Object.entries(record)) {
+        if (omit.has(name) || nested === null || nested === undefined || nested === "") continue;
+        const label = titleCase(name);
+        if (typeof nested === "object" && !Array.isArray(nested)) {
+          const child = nested as Record<string, unknown>;
+          const identity = child.name || child.fullName || child.invoiceNumber || child.billNumber || child.orderNumber || child.receiptNumber || child.deliveryNumber || child.sku;
+          if (identity) parts.push(label + ": " + String(identity));
+          else if (depth < 1) {
+            const details = summarize(child, depth + 1);
+            if (details) parts.push(label + ": " + details);
+          }
+        } else if (Array.isArray(nested)) {
+          if (depth < 1 && nested.length) parts.push(label + ": " + nested.map((child) => summarize(child, depth + 1)).filter(Boolean).join(", "));
+        } else {
+          const rendered = ["total", "subtotal", "discountAmount", "taxAmount", "amount", "unitCost", "unitPrice", "debit", "credit"].includes(name)
+            ? new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(nested))
+            : /Date|At$|^date$|^dueDate$|^expectedAt$/.test(name) && !Number.isNaN(new Date(String(nested)).valueOf())
+              ? new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric" }).format(new Date(String(nested)))
+              : String(nested).replaceAll("_", " ");
+          parts.push(label + ": " + rendered);
+        }
+      }
+      return parts.join(" · ");
+    };
+    return value.map((entry) => summarize(entry)).filter(Boolean).join(" | ") || "—";
   }
   if (["total", "subtotal", "discountAmount", "taxAmount", "paid", "balance", "amount", "unitCost", "unitPrice", "purchaseCost", "sellingPrice", "debit", "credit"].includes(key)) {
     return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(Number(value));
