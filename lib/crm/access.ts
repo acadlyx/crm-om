@@ -38,7 +38,7 @@ export async function writeAuditEvent(input: {
       action: input.action,
       entityType: input.entityType,
       entityId: input.entityId ?? null,
-      metadata: input.metadata ?? {},
+      metadata: JSON.parse(JSON.stringify(input.metadata ?? {})),
     },
   });
 }
