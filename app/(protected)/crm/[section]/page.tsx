@@ -27,6 +27,7 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
   const tenantId = access.tenantId;
   const permission = await requireWorkspacePermission(access, section, "read");
   if (!permission.ok) notFound();
+  const updatePermission = await requireWorkspacePermission(access, section, "update");
 
   if (section === "reports") {
     const monthStart = new Date();
@@ -283,5 +284,5 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
       notFound();
   }
 
-  return <CrmModule key={JSON.stringify(rows)} resource={resource} title={title} description={description} fields={fields} columns={columns} initialRows={rows} workflow={workflow} recordLabel={recordLabel} owner={access.user.role === "TENANT_ADMIN" || access.user.role === "PLATFORM_ADMIN"} />;
+  return <CrmModule key={JSON.stringify(rows)} resource={resource} title={title} description={description} fields={fields} columns={columns} initialRows={rows} workflow={workflow} recordLabel={recordLabel} owner={access.user.role === "TENANT_ADMIN" || access.user.role === "PLATFORM_ADMIN"} canUpdate={updatePermission.ok} />;
 }
