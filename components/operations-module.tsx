@@ -456,7 +456,18 @@ export function OperationsModule({ resource, owner, canUpdate = false }: { resou
       {formOpen && config.writable && <section className="card operations-form-card">
         <div className="owner-panel-heading"><div><p className="dashboard-eyebrow">{editingMaster || editingOrder ? "EDIT RECORD" : "NEW RECORD"}</p><h2>{editingMaster ? "Edit " + (resource === "products" ? "product" : "supplier") : editingOrder ? "Edit draft " + editingOrder.orderNumber : resource === "goods-receipts" ? "Post goods received" : resource === "deliveries" ? "Create delivery" : resource === "customer-receipts" ? "Record customer receipt" : "Add " + config.title.toLowerCase()}</h2></div><button className="crm-secondary-button" type="button" onClick={() => { setFormOpen(false); setEditingOrder(null); setEditingMaster(null); }}><X size={15} />Close</button></div>
         <form className="operations-create-form" onSubmit={submit}>
-          {resource === "products" && <>
+          {resource === "products" && editingMaster && <>
+            <div className="operations-form-grid">
+              <TextField name="name" label="Product name *" required defaultValue={String(editingMaster.name || "")} />
+              <TextField name="category" label="Category" defaultValue={String(editingMaster.category || "")} />
+              <TextField name="sellingPrice" label="Selling price *" type="number" min="0" step="0.01" required defaultValue={String(editingMaster.sellingPrice ?? 0)} />
+              <TextField name="reorderLevel" label="Reorder threshold" type="number" min="0" step="0.001" defaultValue={String(editingMaster.reorderLevel ?? 0)} />
+              {Number(editingMaster.stockOnHand || 0) <= 0 && <TextField name="purchaseCost" label="Purchase cost" type="number" min="0" step="0.01" defaultValue={String(editingMaster.purchaseCost ?? 0)} />}
+              <TextField name="description" label="Description" defaultValue={String(editingMaster.description || "")} />
+            </div>
+            <p className="owner-footnote">SKU and unit are immutable after creation. Purchase cost is editable only when no stock remains, to protect inventory valuation history.</p>
+          </>}
+          {resource === "products" && !editingMaster && <>
             <div className="operations-form-grid">
               <TextField name="sku" label="SKU / product code *" required placeholder="SKU-001" />
               <TextField name="name" label="Product name *" required placeholder="Product name" />
@@ -470,7 +481,17 @@ export function OperationsModule({ resource, owner, canUpdate = false }: { resou
             </div>
             <p className="owner-footnote">Opening stock is posted once to the inventory movement ledger at product creation. Future stock changes must use receipts, deliveries, or audited adjustments.</p>
           </>}
-          {resource === "suppliers" && <div className="operations-form-grid">
+          {resource === "suppliers" && editingMaster && <div className="operations-form-grid">
+            <TextField name="name" label="Supplier name *" required defaultValue={String(editingMaster.name || "")} />
+            <TextField name="company" label="Company" defaultValue={String(editingMaster.company || "")} />
+            <TextField name="email" label="Email" type="email" defaultValue={String(editingMaster.email || "")} />
+            <TextField name="phone" label="Phone" defaultValue={String(editingMaster.phone || "")} />
+            <TextField name="taxId" label="Tax / GST ID" defaultValue={String(editingMaster.taxId || "")} />
+            <TextField name="paymentTermsDays" label="Payment terms (days)" type="number" min="0" max="365" defaultValue={String(editingMaster.paymentTermsDays ?? 0)} />
+            <TextField name="address" label="Address" defaultValue={String(editingMaster.address || "")} />
+            <SelectField name="status" label="Status" defaultValue={String(editingMaster.status || "ACTIVE")} options={[{value:"ACTIVE",label:"Active"},{value:"INACTIVE",label:"Inactive"}]} />
+          </div>}
+          {resource === "suppliers" && !editingMaster && <div className="operations-form-grid">
             <TextField name="name" label="Supplier name *" required />
             <TextField name="company" label="Company" />
             <TextField name="email" label="Email" type="email" />
