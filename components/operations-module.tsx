@@ -297,6 +297,27 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
     }
   }
 
+  async function issueInvoice(row: Row) {
+    if (!window.confirm("Issue a customer invoice from order " + row.orderNumber + "? This will create a financial record and prevent the order from being cancelled.")) return;
+    setNotice("");
+    setError("");
+    try {
+      const response = await fetch("/api/v1/operations/sales-orders/" + encodeURIComponent(row.id), {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "ISSUE_INVOICE" }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error?.message || "Could not issue invoice.");
+      setNotice(result.idempotentReplay
+        ? "This order already has invoice " + result.data.invoiceNumber + "; no duplicate invoice was created."
+        : "Invoice " + result.data.invoiceNumber + " issued successfully.");
+      await loadRows();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not issue invoice.");
+    }
+  }
+
   async function changeStatus(row: Row, status: string) {
     let body: Record<string, unknown> = { status };
     if (status === "REVERSED") {
@@ -496,7 +517,7 @@ export function OperationsModule({ resource, owner }: { resource: string; owner:
           : filtered.length === 0 ? <div className="dashboard-empty"><span className="dashboard-empty-icon"><Search size={18} /></span><strong>{search || statusFilter !== "ALL" ? "No records match your filters" : "Nothing has been recorded yet"}</strong><p>{error || (search || statusFilter !== "ALL" ? "Change the search or status filter and try again." : config.empty)}</p></div>
           : <>
             <div className="workspace-table-wrap"><table className="workspace-table operations-table"><thead><tr>{config.columns.map((column) => <th key={column.key}>{column.label}</th>)}<th>Actions</th></tr></thead>
-              <tbody>{filtered.slice(0, visibleCount).map((row) => <tr key={row.id}>{config.columns.map((column) => <td key={column.key}><Cell row={row} column={column} /></td>)}<td><RowActions resource={resource} row={row} owner={owner} onChange={changeStatus} onUpdate={updateRow} /></td></tr>)}</tbody>
+              <tbody>{filtered.slice(0, visibleCount).map((row) => <tr key={row.id}>{config.columns.map((column) => <td key={column.key}><Cell row={row} column={column} /></td>)}<td><RowActions resource={resource} row={row} owner={owner} onChange={changeStatus} onUpdate={updateRow} onInvoice={issueInvoice} /></td></tr>)}</tbody>
             </table></div>
             <div className="operations-table-footer"><span>Showing {Math.min(visibleCount, filtered.length)} of {filtered.length} matching records</span>
               {filtered.length > visibleCount && <button className="crm-secondary-button" type="button" onClick={() => setVisibleCount((count) => Math.min(filtered.length, count + 20))}>Show more ({filtered.length - visibleCount} remaining) <ArrowRight size={14} /></button>}
@@ -596,7 +617,9 @@ function RowActions({ resource, row, owner, onChange, onUpdate }: {
 }) {
   if (resource === "sales-orders") return <div className="operations-row-actions">
     {row.status === "DRAFT" && <button type="button" className="crm-secondary-button" onClick={()=>onChange(row,"CONFIRMED")}>Confirm</button>}
+    {owner && ["CONFIRMED","PARTIALLY_DELIVERED","DELIVERED"].includes(row.status) && !(row.invoices || []).length && <button type="button" className="crm-secondary-button" onClick={()=>onInvoice(row)}>Issue invoice</button>}
     {["DRAFT","CONFIRMED","PARTIALLY_DELIVERED"].includes(row.status) && <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"CANCELLED")}>Cancel</button>}
+    {(row.invoices || []).map((invoice: Row) => <span key={invoice.id} className="crm-pill crm-pill-active">{invoice.invoiceNumber}</span>)}
   </div>;
   if (resource === "purchase-orders") return <div className="operations-row-actions">
     {!["CANCELLED","RECEIVED"].includes(row.status) && <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"CANCELLED")}>Cancel</button>}
