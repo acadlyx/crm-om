@@ -128,7 +128,7 @@ export async function renderDocumentPdf(data: DocumentPDFData, template: Documen
   };
   const heading = (label: string) => {
     ensure(31);
-    page.drawText(safeText(label).toUpperCase(), { x: margin, y, size: 8, font: bold, color: rgb(accent.r, accent.g, accent.b), characterSpacing: 0.55 });
+    page.drawText(safeText(label).toUpperCase(), { x: margin, y, size: 8, font: bold, color: rgb(accent.r, accent.g, accent.b) });
     y -= 15;
   };
   const drawKeyValues = (values: KeyValue[], columns = 2) => {
