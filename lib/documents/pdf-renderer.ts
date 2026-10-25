@@ -207,25 +207,37 @@ export async function renderDocumentPdf(data: DocumentPDFData, template: Documen
       if (template.headerStyle === "band") {
         page.drawRectangle({ x: margin, y: y - 66, width: contentWidth, height: 76, color: rgb(accentTint.r, accentTint.g, accentTint.b) });
       }
-      if (logo) {
+      const useLogo = Boolean(template.showLogo && logo);
+      const centeredLogo = useLogo && template.logoPosition === "center";
+      let logoHeight = 0;
+      let logoWidth = 0;
+      if (useLogo && logo) {
         const logoSize = template.logoSize;
         const scale = Math.min(logoSize / logo.width, logoSize / logo.height, 1);
-        const logoWidth = logo.width * scale;
-        const logoHeight = logo.height * scale;
+        logoWidth = logo.width * scale;
+        logoHeight = logo.height * scale;
         const logoX = template.logoPosition === "center" ? (width - logoWidth) / 2 : template.logoPosition === "right" ? width - margin - logoWidth : margin;
-        page.drawImage(logo, { x: logoX, y: y - logoHeight + 7, width: logoWidth, height: logoHeight });
+        page.drawImage(logo, { x: logoX, y: centeredLogo ? y - logoHeight + 3 : y - logoHeight + 7, width: logoWidth, height: logoHeight });
       }
-      const nameX = template.showLogo && logo ? (template.logoPosition === "left" ? margin + template.logoSize + 12 : margin) : margin;
-      page.drawText(safeText(data.business.name || "Business"), { x: nameX, y, size: 15, font: bold, color: BLACK, maxWidth: contentWidth - template.logoSize - 8 });
-      let businessY = y - 18;
+      const nameX = useLogo && template.logoPosition === "left" ? margin + template.logoSize + 12 : margin;
+      const nameY = centeredLogo ? y - logoHeight - 8 : y;
+      const brandWidth = useLogo && !centeredLogo ? contentWidth - template.logoSize - 12 : contentWidth;
+      page.drawText(safeText(data.business.name || "Business"), {
+        x: nameX, y: nameY, size: 15, font: bold, color: BLACK, maxWidth: brandWidth,
+        ...(centeredLogo ? { align: "center" as const } : {}),
+      });
+      let businessY = nameY - 18;
       for (const line of [data.business.address, [data.business.email, data.business.phone].filter(Boolean).join("  |  ")].filter(Boolean)) {
         const txt = safeText(line);
         if (txt) {
-          page.drawText(txt, { x: nameX, y: businessY, size: 7.8, font: normal, color: MUTED, maxWidth: contentWidth - Math.max(0, nameX - margin) - 8 });
+          page.drawText(txt, {
+            x: nameX, y: businessY, size: 7.8, font: normal, color: MUTED, maxWidth: brandWidth,
+            ...(centeredLogo ? { align: "center" as const } : {}),
+          });
           businessY -= 11;
         }
       }
-      y -= Math.max(template.logoSize + 14, 55);
+      y -= Math.max(centeredLogo ? logoHeight + 48 : logoHeight + 14, 55);
       if (template.headerStyle === "rule") {
         page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1.7, color: rgb(accent.r, accent.g, accent.b) });
         y -= 17;
