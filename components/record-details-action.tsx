@@ -54,10 +54,6 @@ export function RecordDetailsAction({ endpoint, recordLabel }: { endpoint: strin
       if (event.key === "Escape") setOpen(false);
     };
     window.addEventListener("keydown", closeOnEscape);
-    setLoading(true);
-    setError("");
-    setDetail(null);
-
     void fetch(endpoint, { cache: "no-store", headers: { accept: "application/json" } })
       .then(async (response) => {
         const payload = await response.json().catch(() => null);
@@ -90,7 +86,12 @@ export function RecordDetailsAction({ endpoint, recordLabel }: { endpoint: strin
         className="crm-secondary-button record-details-trigger"
         aria-label={"View details for " + recordLabel}
         title="View full record details"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setError("");
+          setDetail(null);
+          setLoading(true);
+          setOpen(true);
+        }}
       >
         <Eye size={14} aria-hidden="true" /> View
       </button>
@@ -105,7 +106,7 @@ export function RecordDetailsAction({ endpoint, recordLabel }: { endpoint: strin
               </div>
               <div className="record-details-header-actions">
                 {detail?.status && <span className="crm-pill">{humanize(detail.status)}</span>}
-                <button type="button" className="crm-secondary-button record-details-close" aria-label="Close record details" onClick={() => setOpen(false)}>
+                <button type="button" className="crm-secondary-button record-details-close" aria-label="Close record details" autoFocus onClick={() => setOpen(false)}>
                   <X size={17} aria-hidden="true" /> Close
                 </button>
               </div>
