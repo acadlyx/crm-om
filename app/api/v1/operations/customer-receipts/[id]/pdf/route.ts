@@ -50,11 +50,23 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const currency = settings?.currency || "INR";
   const preferences = objectValue(settings?.preferences);
   const rawTemplates = objectValue(preferences.documentTemplates);
+  const legacyTemplate = !rawTemplates.customerReceipt && preferences.receiptTemplate
+    ? normalizeReceiptTemplate(preferences.receiptTemplate)
+    : null;
   let template = normalizeDocumentTemplates(rawTemplates).customerReceipt;
-  // Migrate the visual preferences of older receipt templates until the new studio is saved.
-  if (!rawTemplates.customerReceipt && preferences.receiptTemplate) {
-    const legacy = normalizeReceiptTemplate(preferences.receiptTemplate);
-    template = { ...template, title: legacy.title, accentColor: legacy.accentColor, footerText: legacy.footerText, signatureLabel: legacy.signatureLabel };
+  // Preserve older receipt preferences until the user configures a dedicated document template.
+  if (legacyTemplate) {
+    const hiddenBlocks = new Set(template.hiddenBlocks);
+    if (!legacyTemplate.showAllocations) hiddenBlocks.add("items");
+    if (!legacyTemplate.showNotes) hiddenBlocks.add("notes");
+    template = {
+      ...template,
+      title: legacyTemplate.title,
+      accentColor: legacyTemplate.accentColor,
+      footerText: legacyTemplate.footerText,
+      signatureLabel: legacyTemplate.signatureLabel,
+      hiddenBlocks: [...hiddenBlocks],
+    };
   }
   const allocated = receipt.status === "POSTED" ? receipt.allocations.reduce((sum, allocation) => sum + Number(allocation.amount), 0) : 0;
   const unallocated = receipt.status === "POSTED" ? Math.max(0, Number(receipt.amount) - allocated) : 0;
@@ -75,9 +87,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       label: "Received from",
       name: receipt.customer.name,
       company: receipt.customer.company,
-      email: receipt.customer.email,
-      phone: receipt.customer.phone,
-      address: Array.isArray(receipt.customer.addresses)
+      email: legacyTemplate?.showCustomerContact === false ? null : receipt.customer.email,
+      phone: legacyTemplate?.showCustomerContact === false ? null : receipt.customer.phone,
+      address: legacyTemplate?.showCustomerContact === false ? "" : Array.isArray(receipt.customer.addresses)
         ? receipt.customer.addresses.map((part) => String(part)).join(", ")
         : receipt.customer.addresses && typeof receipt.customer.addresses === "object"
           ? Object.values(receipt.customer.addresses as Record<string, unknown>).map(String).join(", ")
@@ -86,7 +98,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     metadata: [
       { label: "Date received", value: dateLabel(receipt.receivedAt) },
       { label: "Payment method", value: receipt.method.replaceAll("_", " ") },
-      { label: "Transaction reference", value: receipt.reference || "—" },
+      ...(legacyTemplate?.showReference === false ? [] : [{ label: "Transaction reference", value: receipt.reference || "—" }]),
       { label: "Currency", value: currency },
     ],
     items: receipt.allocations.map((allocation) => ({
@@ -99,7 +111,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       { label: "Amount allocated", value: money(allocated, currency) },
       ...(unallocated > 0.005 ? [{ label: "Unallocated amount", value: money(unallocated, currency) }] : []),
     ],
-    notes: [reversed ? "This receipt has been reversed and is not valid as confirmation of payment." : null, receipt.notes].filter(Boolean).join("\n"),
+    notes: legacyTemplate?.showNotes === false ? null : [reversed ? "This receipt has been reversed and is not valid as confirmation of payment." : null, receipt.notes].filter(Boolean).join("\n"),
   };
   try {
     const bytes = await renderDocumentPdf(document, template);
