@@ -34,7 +34,8 @@
     "server-only": "^0.0.1",
     "zod": "^4.1.12",
     "qrcode": "^1.5.4",
-    "sharp": "^0.35.5"
+    "sharp": "^0.35.5",
+    "@vercel/blob": "^2.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
