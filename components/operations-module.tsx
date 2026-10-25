@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  AlertCircle, ArrowDownToLine, ArrowRight, CheckCircle2, Eye, LoaderCircle,
+  AlertCircle, ArrowDownToLine, ArrowRight, CheckCircle2, LoaderCircle,
   Plus, RefreshCw, Search, Trash2, X,
 } from "lucide-react";
-import { RecordDetailDrawer } from "@/components/record-detail-drawer";
+import { RecordDetailsAction } from "@/components/record-details-action";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- One API component renders several resource-specific Prisma payloads; every write is validated server-side.
 type Row = Record<string, any> & { id: string };
@@ -165,8 +165,6 @@ export function OperationsModule({ resource, owner, canUpdate = false, canDelete
   const [editingMaster, setEditingMaster] = useState<Row | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
-  const [detailId, setDetailId] = useState<string | null>(null);
-  const closeDetails = useCallback(() => setDetailId(null), []);
   const [orderLines, setOrderLines] = useState<SalesLine[]>([{ productId: "", quantity: "1", discountPercent: "0", taxPercent: "0" }]);
   const [purchaseLines, setPurchaseLines] = useState([{ productId: "", quantity: "1" }]);
   const [receiptLines, setReceiptLines] = useState([{ purchaseOrderItemId: "", quantity: "1" }]);
@@ -699,7 +697,7 @@ export function OperationsModule({ resource, owner, canUpdate = false, canDelete
           : filtered.length === 0 ? <div className="dashboard-empty"><span className="dashboard-empty-icon"><Search size={18} /></span><strong>{search || statusFilter !== "ALL" ? "No records match your filters" : "Nothing has been recorded yet"}</strong><p>{error || (search || statusFilter !== "ALL" ? "Change the search or status filter and try again." : config.empty)}</p></div>
           : <>
             <div className="workspace-table-wrap"><table className="workspace-table operations-table"><thead><tr>{tableColumns.map((column) => <th key={column.key}>{column.label}</th>)}<th>Actions</th></tr></thead>
-              <tbody>{filtered.slice(0, visibleCount).map((row) => <tr key={row.id}>{tableColumns.map((column) => <td key={column.key} data-column={column.key}><Cell row={row} column={column} /></td>)}<td><div className="operations-row-actions"><button type="button" className="crm-secondary-button" aria-label={"View details for " + String(readKey(row, tableColumns[0]?.key || "name") || resource)} onClick={() => setDetailId(row.id)}><Eye size={14} aria-hidden="true" />View</button><RowActions resource={resource} row={row} owner={owner} canUpdate={canUpdate} onChange={changeStatus} onUpdate={updateRow} onInvoice={issueInvoice} onEdit={handleEditRow} />{canDelete && <button type="button" className="crm-secondary-button is-danger" disabled={busy} title="Delete this record" onClick={() => void deleteRow(row)}><Trash2 size={14} />Delete</button>}</div></td></tr>)}</tbody>
+              <tbody>{filtered.slice(0, visibleCount).map((row) => <tr key={row.id}>{tableColumns.map((column) => <td key={column.key} data-column={column.key}><Cell row={row} column={column} /></td>)}<td><div className="operations-row-actions"><RecordDetailsAction endpoint={"/api/v1/operations/" + encodeURIComponent(resource) + "/" + encodeURIComponent(row.id)} recordLabel={String(readKey(row, tableColumns[0]?.key || "name") || resource)} /><RowActions resource={resource} row={row} owner={owner} canUpdate={canUpdate} onChange={changeStatus} onUpdate={updateRow} onInvoice={issueInvoice} onEdit={handleEditRow} />{canDelete && <button type="button" className="crm-secondary-button is-danger" disabled={busy} title="Delete this record" onClick={() => void deleteRow(row)}><Trash2 size={14} />Delete</button>}</div></td></tr>)}</tbody>
             </table></div>
             <div className="operations-table-footer"><span>Showing {Math.min(visibleCount, filtered.length)} of {filtered.length} matching records</span>
               {filtered.length > visibleCount && <button className="crm-secondary-button" type="button" onClick={() => setVisibleCount((count) => Math.min(filtered.length, count + 20))}>Show more ({filtered.length - visibleCount} remaining) <ArrowRight size={14} /></button>}
@@ -707,7 +705,6 @@ export function OperationsModule({ resource, owner, canUpdate = false, canDelete
             </div>
           </>}
       </section>
-      {detailId && <RecordDetailDrawer source="operations" resource={resource} id={detailId} onClose={closeDetails} />}
     </div>
   );
 }
