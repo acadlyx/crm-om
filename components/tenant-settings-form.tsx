@@ -50,7 +50,7 @@ export function TenantSettingsForm({ initial }: { initial: TenantSettings | null
     <label className="field">Business phone<input type="tel" maxLength={40} value={form.contactPhone||""} onChange={e=>update("contactPhone",e.target.value||null)} /></label>
     <label className="field">Business address<textarea rows={3} maxLength={1000} value={form.address||""} onChange={e=>update("address",e.target.value||null)} /></label>
 
-    <p className="muted document-template-settings-link">Configure invoice, receipt and supplier PDF layouts in <a href="/settings/document-templates">Document templates</a>.</p>
+    <p className="muted document-template-settings-link">Configure invoice, receipt and supplier PDF layouts in <a href="/settings/document-templates" style={{ color: "#315fc9", fontWeight: 750, textDecoration: "underline", textUnderlineOffset: 3 }}>Document templates</a>.</p>
 
     <h2 className="settings-section-heading">Operating preferences</h2>
     <label className="field">Business currency
