@@ -5,6 +5,7 @@ import {
   AlertCircle, ArrowDownToLine, ArrowRight, CheckCircle2, LoaderCircle,
   Plus, RefreshCw, Search, Trash2, X,
 } from "lucide-react";
+import { RecordDetailsAction } from "@/components/record-details-action";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- One API component renders several resource-specific Prisma payloads; every write is validated server-side.
 type Row = Record<string, any> & { id: string };
@@ -695,7 +696,7 @@ export function OperationsModule({ resource, owner, canUpdate = false, canDelete
           : filtered.length === 0 ? <div className="dashboard-empty"><span className="dashboard-empty-icon"><Search size={18} /></span><strong>{search || statusFilter !== "ALL" ? "No records match your filters" : "Nothing has been recorded yet"}</strong><p>{error || (search || statusFilter !== "ALL" ? "Change the search or status filter and try again." : config.empty)}</p></div>
           : <>
             <div className="workspace-table-wrap"><table className="workspace-table operations-table"><thead><tr>{config.columns.map((column) => <th key={column.key}>{column.label}</th>)}<th>Actions</th></tr></thead>
-              <tbody>{filtered.slice(0, visibleCount).map((row) => <tr key={row.id}>{config.columns.map((column) => <td key={column.key}><Cell row={row} column={column} /></td>)}<td><div className="operations-row-actions"><RowActions resource={resource} row={row} owner={owner} canUpdate={canUpdate} onChange={changeStatus} onUpdate={updateRow} onInvoice={issueInvoice} onEdit={handleEditRow} /><button type="button" className="crm-secondary-button is-danger" disabled={!canDelete || busy} title={canDelete ? "Delete this record" : "Deletion permission is restricted to an authorized workspace role"} onClick={() => void deleteRow(row)}><Trash2 size={14} />Delete</button></div></td></tr>)}</tbody>
+              <tbody>{filtered.slice(0, visibleCount).map((row) => <tr key={row.id}>{config.columns.map((column) => <td key={column.key}><Cell row={row} column={column} /></td>)}<td><div className="operations-row-actions">{resource !== "permissions" && <RecordDetailsAction endpoint={"/api/v1/operations/" + encodeURIComponent(resource) + "/" + encodeURIComponent(row.id)} recordLabel={String(readKey(row, config.columns[0]?.key || "id") || resource)} />}<RowActions resource={resource} row={row} owner={owner} canUpdate={canUpdate} onChange={changeStatus} onUpdate={updateRow} onInvoice={issueInvoice} onEdit={handleEditRow} />{canDelete && <button type="button" className="crm-secondary-button is-danger" disabled={busy} title="Delete this record" onClick={() => void deleteRow(row)}><Trash2 size={14} />Delete</button>}</div></td></tr>)}</tbody>
             </table></div>
             <div className="operations-table-footer"><span>Showing {Math.min(visibleCount, filtered.length)} of {filtered.length} matching records</span>
               {filtered.length > visibleCount && <button className="crm-secondary-button" type="button" onClick={() => setVisibleCount((count) => Math.min(filtered.length, count + 20))}>Show more ({filtered.length - visibleCount} remaining) <ArrowRight size={14} /></button>}
