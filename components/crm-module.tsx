@@ -3,7 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowDownToLine, ArrowRight, ArrowUpRight, CheckCircle2, CircleAlert, LoaderCircle,
+  ArrowDownToLine, ArrowRight, ArrowUpRight, CheckCircle2, CircleAlert, Eye, LoaderCircle,
   Plus, Search, Trash2, X,
 } from "lucide-react";
 
@@ -360,7 +360,7 @@ export function CrmModule({
                   {workflow.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>{busyRow === row.id && <LoaderCircle size={13} className="workspace-spinner crm-inline-spinner" />}</td>}
                 {(canDelete || resource === "invoices" || (resource === "payments" && owner) || (resource === "customers" && canUpdate)) && <td><div className="operations-row-actions">
-                  {resource === "invoices" && <a className="crm-secondary-button" href={"/api/v1/operations/invoices/" + encodeURIComponent(row.id) + "/pdf"} download><ArrowDownToLine size={14} />Download PDF</a>}
+                  {resource === "invoices" && <><a className="crm-secondary-button" href={"/operations/invoices/" + encodeURIComponent(row.id)}><Eye size={14} />View invoice</a><a className="crm-secondary-button" href={"/api/v1/operations/invoices/" + encodeURIComponent(row.id) + "/pdf"} download><ArrowDownToLine size={14} />Download PDF</a></>}
                   {resource === "customers" && canUpdate && <button type="button" className="crm-secondary-button" onClick={() => { setError(""); setNotice(""); setEditingCustomer(row); }}>Edit profile</button>}
                   {resource === "payments" && owner && (row.status === "POSTED"
                     ? <button type="button" className="crm-secondary-button is-danger" disabled={busyRow === row.id} onClick={() => void reversePayment(row)}>{busyRow === row.id ? <LoaderCircle size={13} className="workspace-spinner" /> : "Reverse payment"}</button>
