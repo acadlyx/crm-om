@@ -413,12 +413,15 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
               detailField("Phone", row.customer.tenantId === tenantId ? row.customer.phone : null),
               detailField("Address", row.customer.tenantId === tenantId ? addressText(row.customer.addresses) : null),
             ]),
-            detailSection("Invoice items", row.items.flatMap((entry, index) => [
-              detailField((index + 1) + ". " + (entry.product.tenantId === tenantId ? entry.description || entry.product.name : entry.description || "Invoice item") + (entry.product.tenantId === tenantId && entry.product.sku ? " · " + entry.product.sku : ""),
-                String(Number(entry.quantity)) + " " + (entry.product.tenantId === tenantId ? entry.product.unit : "units") + " × " +
-                new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(Number(entry.unitPrice))),
-              detailField("Line total", entry.lineTotal, "money"),
-            ])),
+            detailSection("Invoice items", row.items.flatMap((entry, index) => {
+              const product = entry.product?.tenantId === tenantId ? entry.product : null;
+              return [
+                detailField((index + 1) + ". " + (product ? entry.description || product.name : entry.description || "Invoice item") + (product?.sku ? " · " + product.sku : ""),
+                  String(Number(entry.quantity)) + " " + (product?.unit || "units") + " × " +
+                  new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(Number(entry.unitPrice))),
+                detailField("Line total", entry.lineTotal, "money"),
+              ];
+            })),
             detailSection("Recorded payments", row.payments.flatMap((entry) => [
               detailField([enumText(entry.method), entry.reference, enumText(entry.status)].filter(Boolean).join(" · ") || "Payment", entry.amount, "money"),
               detailField("Payment date · " + enumText(entry.method), entry.paidAt, "datetime"),
