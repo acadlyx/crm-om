@@ -4,6 +4,7 @@ import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
 import { Menu, X } from "lucide-react";
 import "./workspace-shell.css";
 import "./workspace-copy-cleanup.css";
+import "./workspace-ux-overhaul.css";
 
 export function WorkspaceShell({
   sidebar,

@@ -1,0 +1,202 @@
+/* Shared authenticated-workspace readability and responsive layout tokens. */
+.workspace-shell {
+  --workspace-body-size: 14.5px;
+  --workspace-label-size: 13px;
+  --workspace-secondary-size: 12.5px;
+  --workspace-border: #e4e8ef;
+  --workspace-ink: #1f2d42;
+  --workspace-muted: #667085;
+  color: var(--workspace-ink);
+  font-size: var(--workspace-body-size);
+  line-height: 1.55;
+  min-width: 0;
+}
+.workspace-shell .main-content,
+.workspace-shell .main-content > *,
+.workspace-shell .workspace-admin-page,
+.workspace-shell .crm-module-page,
+.workspace-shell .owner-dashboard,
+.workspace-shell .team-admin-page { min-width: 0; }
+.workspace-shell .main-content { padding: clamp(18px, 2.15vw, 32px); }
+.workspace-shell p { line-height: 1.6; }
+.workspace-shell h1,
+.workspace-shell .crm-module-heading h1,
+.workspace-shell .owner-header h1,
+.workspace-shell .dashboard-heading h1,
+.workspace-shell .team-admin-page > header h1 {
+  line-height: 1.2;
+  letter-spacing: -.025em;
+  overflow-wrap: anywhere;
+}
+.workspace-shell .dashboard-eyebrow { font-size: 11px; letter-spacing: .09em; line-height: 1.5; }
+.workspace-shell .dashboard-subtitle {
+  display: block;
+  max-width: 76ch;
+  margin-top: 5px;
+  color: #5e6b7e;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.workspace-shell .dashboard-panel-heading h2,
+.workspace-shell .owner-panel-heading h2,
+.workspace-shell .workspace-form-title h2,
+.workspace-shell .crm-table-toolbar h2 { font-size: 18px; line-height: 1.35; }
+.workspace-shell .dashboard-metric-label,
+.workspace-shell .owner-kpi-label { font-size: 13px; line-height: 1.5; }
+.workspace-shell .dashboard-metric-note,
+.workspace-shell .dashboard-summary-row span:not(.dashboard-summary-icon):not(.dashboard-status),
+.workspace-shell .dashboard-action-copy small,
+.workspace-shell .dashboard-feed-copy span { font-size: 12px; line-height: 1.5; }
+.workspace-shell .dashboard-empty { gap: 4px; }
+.workspace-shell .dashboard-empty strong { font-size: 14px; line-height: 1.45; }
+.workspace-shell .dashboard-empty p { display: block !important; font-size: 13px; line-height: 1.55; }
+.workspace-shell .field { gap: 7px; }
+.workspace-shell .field > span,
+.workspace-shell .field label,
+.workspace-shell .document-field,
+.workspace-shell .workspace-form-grid label { font-size: 13px; line-height: 1.45; }
+.workspace-shell .field input,
+.workspace-shell .field textarea,
+.workspace-shell .field select,
+.workspace-shell input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+.workspace-shell select,
+.workspace-shell textarea {
+  font-size: 14px;
+  line-height: 1.45;
+}
+.workspace-shell .field input,
+.workspace-shell .field select,
+.workspace-shell .field textarea { min-height: 42px; }
+.workspace-shell .field textarea,
+.workspace-shell textarea { min-height: 92px; }
+.workspace-shell button,
+.workspace-shell .crm-secondary-button,
+.workspace-shell .brand-button,
+.workspace-shell a.crm-secondary-button {
+  font-size: 13px;
+  line-height: 1.35;
+}
+.workspace-shell button:not(.mobile-nav-backdrop),
+.workspace-shell .crm-secondary-button,
+.workspace-shell .brand-button { min-height: 38px; }
+.workspace-shell button:focus-visible,
+.workspace-shell a:focus-visible,
+.workspace-shell input:focus-visible,
+.workspace-shell select:focus-visible,
+.workspace-shell textarea:focus-visible {
+  outline: 3px solid #b7caff;
+  outline-offset: 2px;
+}
+.workspace-shell .sidebar-link { min-height: 42px; font-size: 14px; line-height: 1.45; }
+.workspace-shell .sidebar-section-label { font-size: 11px; letter-spacing: .075em; }
+.workspace-shell .crm-table-toolbar { min-width: 0; }
+.workspace-shell .crm-table-toolbar h2 { overflow-wrap: anywhere; }
+.workspace-shell .crm-table-wrap,
+.workspace-shell .workspace-table-wrap,
+.workspace-shell .owner-table-wrap { width: 100%; max-width: 100%; min-width: 0; }
+.workspace-shell .crm-table,
+.workspace-shell .workspace-table,
+.workspace-shell .operations-table,
+.workspace-shell .owner-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.workspace-shell .crm-table th,
+.workspace-shell .workspace-table th,
+.workspace-shell .owner-table th {
+  padding: 12px 13px;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.workspace-shell .crm-table td,
+.workspace-shell .workspace-table td,
+.workspace-shell .operations-table td,
+.workspace-shell .owner-table td {
+  padding: 12px 13px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+.workspace-shell .crm-table td:first-child strong,
+.workspace-shell .workspace-table td:first-child strong { font-size: 14px; line-height: 1.4; }
+.workspace-shell .crm-pill,
+.workspace-shell .dashboard-status,
+.workspace-shell .dashboard-role { font-size: 12px; line-height: 1.35; }
+.workspace-shell .operations-row-actions { gap: 7px; min-width: max-content; }
+.workspace-shell .crm-table-footnote { font-size: 12px; line-height: 1.5; }
+.workspace-shell .muted { color: #5f6d80; }
+.workspace-shell .workspace-form-message,
+.workspace-shell .crm-notice { font-size: 13.5px; line-height: 1.55; }
+.workspace-shell .workspace-form-message p,
+.workspace-shell .crm-notice p { margin: 0; }
+.workspace-shell .workspace-form-grid,
+.workspace-shell .crm-form-grid,
+.workspace-shell .operations-form-grid { min-width: 0; }
+.workspace-shell .operations-form-grid > *,
+.workspace-shell .workspace-form-grid > *,
+.workspace-shell .crm-form-grid > * { min-width: 0; }
+.workspace-shell .operations-table-footer { display:flex; flex-wrap:wrap; align-items:center; gap:9px 14px; font-size:12.5px; }
+.workspace-shell .operations-table-footer > span { margin-right:auto; }
+.workspace-shell .crm-module-heading,
+.workspace-shell .owner-header,
+.workspace-shell .team-admin-page > header { min-width:0; }
+.workspace-shell :where(.crm-module-heading,.owner-header,.team-admin-page > header) h1 { font-size:clamp(25px,2.2vw,32px); }
+.workspace-shell :where(.crm-module-heading,.owner-header,.team-admin-page > header) .dashboard-subtitle { max-width:70ch; }
+.workspace-shell [data-long-value],
+.workspace-shell code { overflow-wrap:anywhere; word-break:break-word; }
+.workspace-shell .workspace-table-wrap,
+.workspace-shell .crm-table-wrap,
+.workspace-shell .owner-table-wrap { overflow-x:auto; overscroll-behavior-inline:contain; -webkit-overflow-scrolling:touch; }
+.workspace-shell .detail-grid,
+.workspace-shell .document-template-layout { min-width:0; }
+
+@media (max-width: 1024px) {
+  .workspace-shell .main-content { padding: 22px 18px; }
+  .workspace-shell .crm-table td,
+  .workspace-shell .workspace-table td,
+  .workspace-shell .operations-table td { padding: 11px 10px; }
+}
+@media (max-width: 760px) {
+  .workspace-shell { --workspace-body-size: 14px; }
+  .workspace-shell .main-content { padding: 18px 14px calc(28px + env(safe-area-inset-bottom)); }
+  .workspace-shell .dashboard-subtitle { font-size: 13.5px; }
+  .workspace-shell .crm-module-heading h1,
+  .workspace-shell .owner-header h1,
+  .workspace-shell .dashboard-heading h1 { font-size: clamp(25px, 6.7vw, 30px); }
+  .workspace-shell .workspace-table,
+  .workspace-shell .crm-table { min-width: 620px; }
+  .workspace-shell .operations-table { min-width: 680px; }
+  .workspace-shell .owner-table-wrap table { min-width: 620px; }
+  .workspace-shell .crm-table-toolbar-actions,
+  .workspace-shell .operations-table-actions,
+  .workspace-shell .operations-heading-actions { min-width:0; }
+  .workspace-shell .crm-table-toolbar-actions > *,
+  .workspace-shell .operations-table-actions > * { max-width:100%; }
+}
+@media (max-width: 420px) {
+  .workspace-shell .main-content { padding: 14px 10px calc(24px + env(safe-area-inset-bottom)); }
+  .workspace-shell .card,
+  .workspace-shell .workspace-admin-card,
+  .workspace-shell .workspace-list-card { padding: 14px; }
+  .workspace-shell .dashboard-panel-heading h2,
+  .workspace-shell .owner-panel-heading h2,
+  .workspace-shell .workspace-form-title h2 { font-size: 17px; }
+  .workspace-shell .crm-table,
+  .workspace-shell .workspace-table { min-width: 590px; }
+  .workspace-shell .operations-table { min-width: 650px; }
+  .workspace-shell .crm-table th,
+  .workspace-shell .workspace-table th,
+  .workspace-shell .crm-table td,
+  .workspace-shell .workspace-table td,
+  .workspace-shell .operations-table td { padding: 10px 9px; }
+  .workspace-shell .operations-table-footer button { flex:1 1 auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-shell * { scroll-behavior:auto !important; transition-duration:.01ms !important; animation-duration:.01ms !important; animation-iteration-count:1 !important; }
+}

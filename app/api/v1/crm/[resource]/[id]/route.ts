@@ -5,6 +5,7 @@ import { invoiceStatusFromBalance } from "@/lib/operations/finance";
 import { requireWorkspaceAccess, writeAuditEvent } from "@/lib/crm/access";
 import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { db } from "@/lib/db";
+import { addressText, detailField, detailSection, type RecordDetail } from "@/lib/record-details/types";
 
 export async function PATCH(request: Request, context: { params: Promise<{ resource: string; id: string }> }) {
   const access = await requireWorkspaceAccess();
@@ -276,5 +277,233 @@ export async function DELETE(request: Request, context: { params: Promise<{ reso
     if (code === "P2034") return fail(409, "Another transaction changed this record. Refresh the list and retry.");
     console.error("CRM delete failed.", resource, code || "UNKNOWN");
     return fail(500, "Could not delete the record. No intentional data change was made; refresh and retry.");
+  }
+}
+
+
+// Read-only, tenant-scoped detail payloads. Only business-safe fields are serialized.
+export async function GET(_request: Request, context: { params: Promise<{ resource: string; id: string }> }) {
+  const access = await requireWorkspaceAccess();
+  if (!access.ok) return Response.json({ error: { message: access.message } }, { status: access.status });
+  const { resource, id } = await context.params;
+  const permission = await requireWorkspacePermission(access, resource, "read");
+  if (!permission.ok) return Response.json({ error: { message: permission.message } }, { status: permission.status });
+  if (!z.string().uuid().safeParse(id).success) {
+    return Response.json({ error: { message: "Invalid record identifier." } }, { status: 400 });
+  }
+
+  const tenantId = access.tenantId;
+  let detail: RecordDetail | null = null;
+  const enumText = (value: string | null | undefined) => value ? value.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase()) : null;
+
+  try {
+    switch (resource) {
+      case "customers": {
+        const row = await db.customer.findFirst({
+          where: { id, tenantId },
+          include: {
+            deals: { where: { tenantId }, orderBy: { createdAt: "desc" }, take: 8, select: { title: true, stage: true, value: true } },
+            invoices: { where: { tenantId }, orderBy: { createdAt: "desc" }, take: 8, select: { id: true, invoiceNumber: true, status: true, total: true, dueDate: true } },
+            tasks: { where: { tenantId }, orderBy: { createdAt: "desc" }, take: 8, select: { title: true, status: true, dueDate: true } },
+            followUps: { where: { tenantId }, orderBy: { dueAt: "desc" }, take: 8, select: { title: true, status: true, dueAt: true } },
+          },
+        });
+        if (row) detail = {
+          type: "Customer", title: row.name, status: row.status,
+          sections: [
+            detailSection("Contact details", [
+              detailField("Company", row.company), detailField("Email", row.email), detailField("Phone", row.phone),
+              detailField("Address", addressText(row.addresses)), detailField("Customer notes", row.notes),
+            ]),
+            detailSection("Account terms", [
+              detailField("Account status", row.status, "status"), detailField("Credit limit", row.creditLimit, "money"),
+              detailField("Payment terms (days)", row.paymentTermsDays, "number"),
+              detailField("Created", row.createdAt, "datetime"), detailField("Last updated", row.updatedAt, "datetime"),
+            ]),
+            detailSection("Recent invoices", row.invoices.map((entry) =>
+              detailField(entry.invoiceNumber, entry.total, "money", "/operations/invoices/" + encodeURIComponent(entry.id)))),
+            detailSection("Recent opportunities", row.deals.flatMap((entry) => [
+              detailField(entry.title + " · " + enumText(entry.stage), entry.value, "money"),
+            ])),
+            detailSection("Recent tasks", row.tasks.flatMap((entry) => [
+              detailField(entry.title, entry.status, "status"),
+              detailField("Due · " + entry.title, entry.dueDate, "date"),
+            ])),
+            detailSection("Recent follow-ups", row.followUps.flatMap((entry) => [
+              detailField(entry.title, entry.status, "status"),
+              detailField("Due · " + entry.title, entry.dueAt, "datetime"),
+            ])),
+          ],
+        };
+        break;
+      }
+      case "leads": {
+        const row = await db.lead.findFirst({
+          where: { id, tenantId },
+          include: { deals: { where: { tenantId }, orderBy: { createdAt: "desc" }, take: 8, select: { title: true, stage: true, value: true } } },
+        });
+        if (row) detail = {
+          type: "Lead", title: row.fullName, status: row.status,
+          sections: [
+            detailSection("Contact details", [
+              detailField("Company", row.company), detailField("Email", row.email), detailField("Phone", row.phone),
+              detailField("Lead source", row.source), detailField("Notes", row.notes),
+            ]),
+            detailSection("Qualification", [
+              detailField("Status", row.status, "status"), detailField("Estimated value", row.estimatedValue, "money"),
+              detailField("Created", row.createdAt, "datetime"), detailField("Last updated", row.updatedAt, "datetime"),
+            ]),
+            detailSection("Related opportunities", row.deals.map((entry) =>
+              detailField(entry.title + " · " + enumText(entry.stage), entry.value, "money"))),
+          ],
+        };
+        break;
+      }
+      case "deals": {
+        const row = await db.deal.findFirst({
+          where: { id, tenantId },
+          include: {
+            customer: { select: { tenantId: true, name: true, company: true } },
+            lead: { select: { tenantId: true, fullName: true, company: true } },
+          },
+        });
+        if (row) detail = {
+          type: "Sales opportunity", title: row.title, status: row.stage,
+          sections: [
+            detailSection("Opportunity", [
+              detailField("Stage", row.stage, "status"), detailField("Estimated value", row.value, "money"),
+              detailField("Expected close", row.expectedCloseDate, "date"), detailField("Closed at", row.closedAt, "datetime"),
+              detailField("Notes", row.notes), detailField("Created", row.createdAt, "datetime"),
+              detailField("Last updated", row.updatedAt, "datetime"),
+            ]),
+            detailSection("Related contacts", [
+              detailField("Customer", row.customer?.tenantId === tenantId ? [row.customer.name, row.customer.company].filter(Boolean).join(" · ") : null),
+              detailField("Lead", row.lead?.tenantId === tenantId ? [row.lead.fullName, row.lead.company].filter(Boolean).join(" · ") : null),
+            ]),
+          ],
+        };
+        break;
+      }
+      case "invoices": {
+        const row = await db.invoice.findFirst({
+          where: { id, tenantId },
+          include: {
+            customer: { select: { tenantId: true, name: true, company: true, email: true, phone: true, addresses: true } },
+            salesOrder: { select: { tenantId: true, orderNumber: true } },
+            items: { include: { product: { select: { tenantId: true, sku: true, name: true, unit: true } } } },
+            payments: { where: { tenantId }, orderBy: { paidAt: "desc" }, take: 12, select: { amount: true, method: true, reference: true, status: true, paidAt: true } },
+            receiptAllocations: { include: { receipt: { select: { tenantId: true, receiptNumber: true, amount: true, method: true, status: true, receivedAt: true } } } },
+          },
+        });
+        if (row) detail = {
+          type: "Customer invoice", title: row.invoiceNumber, reference: row.customer.tenantId === tenantId ? row.customer.name : null, status: row.status,
+          sections: [
+            detailSection("Invoice details", [
+              detailField("Status", row.status, "status"), detailField("Issue date", row.issueDate, "date"),
+              detailField("Due date", row.dueDate, "date"), detailField("Subtotal", row.subtotal, "money"),
+              detailField("Discount", row.discountAmount, "money"), detailField("Tax", row.taxAmount, "money"),
+              detailField("Invoice total", row.total, "money"), detailField("Notes", row.notes),
+              detailField("Related sales order", row.salesOrder?.tenantId === tenantId ? row.salesOrder.orderNumber : null),
+              detailField("Created", row.createdAt, "datetime"), detailField("Last updated", row.updatedAt, "datetime"),
+            ]),
+            detailSection("Customer", [
+              detailField("Name", row.customer.tenantId === tenantId ? row.customer.name : null),
+              detailField("Company", row.customer.tenantId === tenantId ? row.customer.company : null),
+              detailField("Email", row.customer.tenantId === tenantId ? row.customer.email : null),
+              detailField("Phone", row.customer.tenantId === tenantId ? row.customer.phone : null),
+              detailField("Address", row.customer.tenantId === tenantId ? addressText(row.customer.addresses) : null),
+            ]),
+            detailSection("Invoice items", row.items.flatMap((entry, index) => {
+              const product = entry.product?.tenantId === tenantId ? entry.product : null;
+              return [
+                detailField((index + 1) + ". " + (product ? entry.description || product.name : entry.description || "Invoice item") + (product?.sku ? " · " + product.sku : ""),
+                  String(Number(entry.quantity)) + " " + (product?.unit || "units") + " × " +
+                  new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(Number(entry.unitPrice))),
+                detailField("Line total", entry.lineTotal, "money"),
+              ];
+            })),
+            detailSection("Recorded payments", row.payments.flatMap((entry) => [
+              detailField([enumText(entry.method), entry.reference, enumText(entry.status)].filter(Boolean).join(" · ") || "Payment", entry.amount, "money"),
+              detailField("Payment date · " + enumText(entry.method), entry.paidAt, "datetime"),
+            ])),
+            detailSection("Receipt allocations", row.receiptAllocations.filter((entry) => entry.receipt.tenantId === tenantId).flatMap((entry) => [
+              detailField(entry.receipt.receiptNumber + " · " + [enumText(entry.receipt.method), enumText(entry.receipt.status)].filter(Boolean).join(" · "),
+                entry.amount, "money"),
+              detailField("Received on · " + entry.receipt.receiptNumber, entry.receipt.receivedAt, "datetime"),
+            ])),
+          ],
+        };
+        break;
+      }
+      case "payments": {
+        const row = await db.payment.findFirst({
+          where: { id, tenantId },
+          include: { invoice: { select: { id: true, tenantId: true, invoiceNumber: true, total: true, dueDate: true, customer: { select: { tenantId: true, name: true } } } } },
+        });
+        if (row) detail = {
+          type: "Customer payment", title: row.invoice.tenantId === tenantId ? "Payment · " + row.invoice.invoiceNumber : "Customer payment",
+          reference: row.reference || null, status: row.status,
+          sections: [
+            detailSection("Payment details", [
+              detailField("Amount received", row.amount, "money"), detailField("Method", row.method, "status"),
+              detailField("Transaction reference", row.reference), detailField("Payment date", row.paidAt, "datetime"),
+              detailField("Status", row.status, "status"), detailField("Notes", row.notes),
+              detailField("Recorded", row.createdAt, "datetime"),
+            ]),
+            detailSection("Related invoice", [
+              detailField("Invoice", row.invoice.tenantId === tenantId ? row.invoice.invoiceNumber : null, "text", row.invoice.tenantId === tenantId ? "/operations/invoices/" + encodeURIComponent(row.invoice.id) : undefined),
+              detailField("Customer", row.invoice.tenantId === tenantId && row.invoice.customer.tenantId === tenantId ? row.invoice.customer.name : null),
+              detailField("Invoice total", row.invoice.tenantId === tenantId ? row.invoice.total : null, "money"),
+              detailField("Due date", row.invoice.tenantId === tenantId ? row.invoice.dueDate : null, "date"),
+            ]),
+          ],
+        };
+        break;
+      }
+      case "expenses": {
+        const row = await db.expense.findFirst({ where: { id, tenantId } });
+        if (row) detail = {
+          type: "Expense", title: row.title, reference: row.category, status: row.status,
+          sections: [detailSection("Expense details", [
+            detailField("Category", row.category), detailField("Amount", row.amount, "money"),
+            detailField("Expense date", row.spentAt, "date"), detailField("Vendor", row.vendor),
+            detailField("Payment method", row.method, "status"), detailField("Status", row.status, "status"),
+            detailField("Notes", row.notes), detailField("Created", row.createdAt, "datetime"),
+            detailField("Last updated", row.updatedAt, "datetime"),
+          ])],
+        };
+        break;
+      }
+      case "tasks": {
+        const row = await db.task.findFirst({
+          where: { id, tenantId },
+          include: { customer: { select: { tenantId: true, name: true, company: true } } },
+        });
+        if (row) detail = {
+          type: "Task", title: row.title, status: row.status,
+          sections: [
+            detailSection("Task details", [
+              detailField("Status", row.status, "status"), detailField("Priority", row.priority, "status"),
+              detailField("Due date", row.dueDate, "datetime"), detailField("Description", row.description),
+              detailField("Created", row.createdAt, "datetime"), detailField("Last updated", row.updatedAt, "datetime"),
+            ]),
+            detailSection("Related customer", [
+              detailField("Customer", row.customer?.tenantId === tenantId ? [row.customer.name, row.customer.company].filter(Boolean).join(" · ") : null),
+            ]),
+          ],
+        };
+        break;
+      }
+      default:
+        return Response.json({ error: { message: "Full details are not supported for this record type." } }, { status: 404 });
+    }
+
+    if (!detail) return Response.json({ error: { message: "Record not found in this workspace." } }, { status: 404 });
+    const settings = await db.businessSettings.findUnique({ where: { tenantId }, select: { currency: true } });
+    detail.currency = settings?.currency || "INR";
+    return Response.json({ data: detail }, { headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
+  } catch (error) {
+    console.error("CRM detail read failed.", resource, (error as { code?: string })?.code || "UNKNOWN");
+    return Response.json({ error: { message: "Could not load this record's details." } }, { status: 500, headers: { "Cache-Control": "private, no-store" } });
   }
 }

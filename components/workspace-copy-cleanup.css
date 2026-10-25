@@ -1,6 +1,12 @@
-/* Keep authenticated workspaces task-focused. Critical field validation and financial safeguards remain visible. */
-.workspace-shell .dashboard-subtitle,
-.workspace-shell .main-content > p.muted,
-.workspace-shell .dashboard-empty > p {
-  display: none !important;
+/* Hide only descriptions that repeat ordinary labels. Safety-critical operations retain concise guidance. */
+.workspace-shell .crm-module-heading.is-compact .dashboard-subtitle,
+.workspace-shell .owner-header .dashboard-subtitle,
+.workspace-shell .team-admin-page .dashboard-subtitle {
+  display: none;
+}
+
+/* Keep empty, loading, validation, and authorization messages available to users. */
+.workspace-shell .dashboard-empty > p,
+.workspace-shell .main-content > p.muted {
+  display: block;
 }
