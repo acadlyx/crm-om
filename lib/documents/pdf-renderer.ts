@@ -96,9 +96,14 @@ export async function renderDocumentPdf(data: DocumentPDFData, template: Documen
   pdf.setSubject(safeText(data.kind + " PDF"));
   pdf.setCreator(safeText(data.business.name || "Business"));
   pdf.setProducer(safeText(data.producer || "CRM document renderer"));
-  const normal = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const italic = await pdf.embedFont(StandardFonts.HelveticaOblique);
+  const fontSet = template.fontFamily === "TimesRoman"
+    ? { normal: StandardFonts.TimesRoman, bold: StandardFonts.TimesRomanBold, italic: StandardFonts.TimesRomanItalic }
+    : template.fontFamily === "Courier"
+      ? { normal: StandardFonts.Courier, bold: StandardFonts.CourierBold, italic: StandardFonts.CourierOblique }
+      : { normal: StandardFonts.Helvetica, bold: StandardFonts.HelveticaBold, italic: StandardFonts.HelveticaOblique };
+  const normal = await pdf.embedFont(fontSet.normal);
+  const bold = await pdf.embedFont(fontSet.bold);
+  const italic = await pdf.embedFont(fontSet.italic);
   const logo = template.showLogo ? await embedLogo(pdf, data.business.logoUrl) : null;
 
   let page = pdf.addPage(size);
