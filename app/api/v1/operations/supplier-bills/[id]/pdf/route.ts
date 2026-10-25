@@ -40,7 +40,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       include: {
         supplier: true,
         purchaseOrder: {
-          include: { items: { include: { product: { select: { name: true, sku: true, unit: true } } } },
+          include: {
+            items: { include: { product: { select: { name: true, sku: true, unit: true } } } },
+          },
         },
         allocations: { include: { payment: { select: { amount: true, status: true, method: true, reference: true, paidAt: true } } } },
       },
