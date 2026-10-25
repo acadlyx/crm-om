@@ -222,7 +222,7 @@ export function DocumentTemplatesBuilder({
 
         <section className="document-preview-panel">
           <div className="document-preview-toolbar"><div><p className="dashboard-eyebrow">LIVE PREVIEW</p><h2>{DOCUMENT_LABELS[selected]}</h2></div><span className="document-preview-status"><span />Sample data</span></div>
-          <p className="document-preview-note">This preview updates as you edit. Actual PDFs use the saved template with the selected record's real data.</p>
+          <p className="document-preview-note">This preview updates as you edit. Actual PDFs use the saved template with the selected record&apos;s real data.</p>
           <div className="document-preview-stage">
             <article className={"document-preview-paper " + template.orientation} style={paperStyle}>
               {visibleBlocks.map((block) => (
