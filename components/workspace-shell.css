@@ -3,9 +3,6 @@
 .workspace-shell .mobile-shell-header { display: none; }
 .workspace-shell .mobile-nav-backdrop { display: none; }
 .workspace-shell .mobile-shell-toggle { display: none; }
-.workspace-shell .crm-module-heading .dashboard-subtitle,
-.workspace-shell .owner-header .dashboard-subtitle,
-.workspace-shell .team-admin-page .dashboard-subtitle { display: none; }
 
 @media (max-width: 760px) {
   .shell.workspace-shell { display: flex; flex-direction: column; width: 100%; min-width: 0; }
