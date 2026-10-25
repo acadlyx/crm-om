@@ -6,6 +6,7 @@ import { requireWorkspaceAccess } from "@/lib/crm/access";
 import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { BrandLogo } from "@/components/brand-logo";
 import { PrintButton } from "@/components/print-button";
+import { ArrowDownToLine } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +57,7 @@ export default async function InvoiceDocumentPage({ params }: { params: Promise<
 
   return (
     <div className="invoice-document-page">
-      <div className="invoice-document-toolbar"><Link className="crm-secondary-button" href="/crm/invoices">Back to invoices</Link><PrintButton /></div>
+      <div className="invoice-document-toolbar"><Link className="crm-secondary-button" href="/crm/invoices">Back to invoices</Link><a className="crm-secondary-button" href={"/api/v1/operations/invoices/" + encodeURIComponent(id) + "/pdf"} download><ArrowDownToLine size={15} />Download PDF</a><PrintButton /></div>
       <article className="invoice-document">
         <header className="invoice-document-header">
           <div className="invoice-company">
