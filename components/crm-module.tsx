@@ -34,8 +34,6 @@ const CRM_SUMMARY_COLUMN_KEYS: Record<string, string[]> = {
   tasks: ["title", "customerName", "dueDate", "priority", "status"],
 };
 
-
-
 function humanize(value: string) {
   return value.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
@@ -275,7 +273,7 @@ export function CrmModule({
 
   return (
     <div className="crm-module-page">
-      <header className="crm-module-heading is-compact">
+      <header className={"crm-module-heading" + (["invoices", "payments"].includes(resource) ? "" : " is-compact")}>
         <div><p className="dashboard-eyebrow">BUSINESS WORKSPACE</p><h1>{title}</h1><p className="dashboard-subtitle">{description}</p></div>
         <button type="button" className="brand-button crm-add-button" onClick={() => { setOpen((value) => !value); setError(""); setNotice(""); }}>
           {open ? <X size={17} /> : <Plus size={17} />}{open ? "Close form" : "Add " + (recordLabel || title.replace(/s$/, ""))}
@@ -393,8 +391,7 @@ export function CrmModule({
           <div className="dashboard-empty crm-empty">
             <span className="dashboard-empty-icon"><Search size={20} aria-hidden="true" /></span>
             <strong>{query ? "No matching records" : "Nothing here yet"}</strong>
-            <p>{query ? "Try a different search term." : "Create your first record with the Add button. Your saved data will appear here."}</p>
-            {!query && <button type="button" className="dashboard-text-link crm-empty-add" onClick={() => setOpen(true)}>Add your first record <ArrowRight size={15} /></button>}
+            <p>{query ? "Try a different search term." : "Saved records will appear here after the first record is added."}</p>
           </div>
         )}
         {filteredRows.length > 3 && <div className="operations-table-footer">
