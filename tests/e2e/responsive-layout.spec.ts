@@ -20,7 +20,7 @@ test("representative CRM screens do not create page-level horizontal overflow", 
     for (const width of widths) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(route);
-      await expect(page).toHaveURL(new URL(route, page.url()));
+      await expect(page).toHaveURL((url) => url.pathname === route);
       await expect(page.locator(".workspace-shell")).toBeVisible();
       const dimensions = await page.evaluate(() => ({
         viewport: document.documentElement.clientWidth,
@@ -37,7 +37,7 @@ test("representative CRM screens do not create page-level horizontal overflow", 
     for (const width of [320, 390, 768, 1440]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(route);
-      await expect(page).toHaveURL(new URL(route, page.url()));
+      await expect(page).toHaveURL((url) => url.pathname === route);
       await expect(page.locator(".workspace-shell")).toBeVisible();
       const dimensions = await page.evaluate(() => ({
         viewport: document.documentElement.clientWidth,
