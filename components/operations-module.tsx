@@ -19,7 +19,7 @@ const defaultCatalogs: Catalogs = {
   customers: [], invoices: [], products: [], suppliers: [], salesOrders: [], purchaseOrders: [], supplierBills: [], team: [],
 };
 
-const moduleConfig: Record<string, { title: string; description: string; columns: Column[]; tableColumnKeys?: string[]; empty: string; writable: boolean }> = {
+const moduleConfig: Record<string, { title: string; description: string; columns: Column[]; tableColumnKeys?: string[]; showDescription?: boolean; empty: string; writable: boolean }> = {
   products: { tableColumnKeys: ["sku", "name", "category", "stockOnHand", "reorderLevel", "sellingPrice", "status"], title: "Products & inventory", description: "Manage SKUs, costs, selling prices, opening stock and reorder thresholds. Every stock change is recorded in the movement ledger.", columns: [
     { key: "sku", label: "SKU" }, { key: "name", label: "Product" }, { key: "category", label: "Category" }, { key: "unit", label: "Unit" },
     { key: "description", label: "Description" }, { key: "stockOnHand", label: "On hand" }, { key: "reorderLevel", label: "Reorder at" },
@@ -31,30 +31,30 @@ const moduleConfig: Record<string, { title: string; description: string; columns
     { key: "phone", label: "Phone" }, { key: "address", label: "Address" }, { key: "taxId", label: "Tax ID" },
     { key: "paymentTermsDays", label: "Terms (days)" }, { key: "status", label: "Status" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No suppliers recorded yet.", writable: true },
-  "sales-orders": { tableColumnKeys: ["orderNumber", "customer.name", "orderDate", "expectedDeliveryAt", "items.length", "total", "status"], title: "Orders & sales", description: "Create orders using current catalog prices. Orders do not deduct stock; stock is issued only when a delivery is completed.", columns: [
+  "sales-orders": { tableColumnKeys: ["orderNumber", "customer.name", "orderDate", "expectedDeliveryAt", "items.length", "total", "status"], showDescription: true, title: "Orders & sales", description: "Inventory is deducted only when delivery is completed.", columns: [
     { key: "orderNumber", label: "Order" }, { key: "customer.name", label: "Customer" }, { key: "customer.company", label: "Company" },
     { key: "orderDate", label: "Order date" }, { key: "expectedDeliveryAt", label: "Expected delivery" }, { key: "items.length", label: "Lines" },
     { key: "subtotal", label: "Subtotal" }, { key: "discountAmount", label: "Discount" }, { key: "taxAmount", label: "Tax" },
     { key: "total", label: "Total" }, { key: "status", label: "Status" }, { key: "notes", label: "Notes" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No sales orders in this workspace yet.", writable: true },
-  "purchase-orders": { tableColumnKeys: ["orderNumber", "supplier.name", "orderDate", "expectedAt", "items.length", "total", "status"], title: "Purchase orders", description: "Create supplier orders. Inventory increases only from a posted goods receipt—not when a purchase order is created.", columns: [
+  "purchase-orders": { tableColumnKeys: ["orderNumber", "supplier.name", "orderDate", "expectedAt", "items.length", "total", "status"], showDescription: true, title: "Purchase orders", description: "Inventory increases only after goods are received—not when a purchase order is created.", columns: [
     { key: "orderNumber", label: "PO number" }, { key: "supplier.name", label: "Supplier" }, { key: "supplier.company", label: "Supplier company" },
     { key: "orderDate", label: "Order date" }, { key: "expectedAt", label: "Expected" }, { key: "items.length", label: "Lines" },
     { key: "subtotal", label: "Subtotal" }, { key: "taxAmount", label: "Tax" }, { key: "total", label: "Total" },
     { key: "status", label: "Status" }, { key: "notes", label: "Notes" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No purchase orders yet.", writable: true },
-  "goods-receipts": { tableColumnKeys: ["receiptNumber", "purchaseOrder.orderNumber", "purchaseOrder.supplier.name", "receivedAt", "items.length", "status"], title: "Goods receipts", description: "Post actual quantities received against purchase-order lines. Receipt posting and stock increases are atomic and idempotent.", columns: [
+  "goods-receipts": { tableColumnKeys: ["receiptNumber", "purchaseOrder.orderNumber", "purchaseOrder.supplier.name", "receivedAt", "items.length", "status"], showDescription: true, title: "Goods receipts", description: "Post the actual quantities received; this is the step that increases stock.", columns: [
     { key: "receiptNumber", label: "Receipt" }, { key: "purchaseOrder.orderNumber", label: "Purchase order" },
     { key: "purchaseOrder.supplier.name", label: "Supplier" }, { key: "receivedAt", label: "Received" }, { key: "items.length", label: "Lines" },
     { key: "notes", label: "Notes" }, { key: "status", label: "Status" }, { key: "createdAt", label: "Created" },
   ], empty: "No goods receipts have been posted.", writable: true },
-  deliveries: { tableColumnKeys: ["deliveryNumber", "order.orderNumber", "order.customer.name", "scheduledAt", "assignedUser.name", "status"], title: "Deliveries", description: "Create deliveries from confirmed orders, dispatch them, and post delivered quantities. Stock is deducted exactly once when delivery is completed.", columns: [
+  deliveries: { tableColumnKeys: ["deliveryNumber", "order.orderNumber", "order.customer.name", "scheduledAt", "assignedUser.name", "status"], showDescription: true, title: "Deliveries", description: "Stock is deducted once when delivered quantities are confirmed.", columns: [
     { key: "deliveryNumber", label: "Delivery" }, { key: "order.orderNumber", label: "Order" },
     { key: "order.customer.name", label: "Customer" }, { key: "scheduledAt", label: "Scheduled" }, { key: "dispatchedAt", label: "Dispatched" },
     { key: "completedAt", label: "Completed" }, { key: "assignedUser.name", label: "Assigned to" }, { key: "items.length", label: "Lines" },
     { key: "proofOfDelivery", label: "Proof of delivery" }, { key: "failureReason", label: "Failure reason" }, { key: "status", label: "Status" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No deliveries yet.", writable: true },
-  "customer-receipts": { tableColumnKeys: ["receiptNumber", "customer.name", "amount", "method", "reference", "receivedAt", "allocations.length", "status"], title: "Customer receipts & allocations", description: "Record an actual customer receipt and allocate portions across invoices. The receipt is counted once while each allocation reduces one invoice balance.", columns: [
+  "customer-receipts": { tableColumnKeys: ["receiptNumber", "customer.name", "amount", "method", "reference", "receivedAt", "allocations.length", "status"], showDescription: true, title: "Customer receipts & allocations", description: "Allocate each receipt across invoices; the posted receipt is counted once and each allocation reduces the matching invoice balance.", columns: [
     { key: "receiptNumber", label: "Receipt" }, { key: "customer.name", label: "Customer" }, { key: "customer.company", label: "Company" },
     { key: "amount", label: "Received" }, { key: "method", label: "Method" }, { key: "reference", label: "UTR / reference" },
     { key: "receivedAt", label: "Date received" }, { key: "allocations.length", label: "Allocations" }, { key: "notes", label: "Notes" },
@@ -66,12 +66,12 @@ const moduleConfig: Record<string, { title: string; description: string; columns
     { key: "total", label: "Total" }, { key: "paid", label: "Paid" }, { key: "balance", label: "Outstanding" }, { key: "status", label: "Status" },
     { key: "notes", label: "Notes" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No supplier bills recorded.", writable: true },
-  "supplier-payments": { tableColumnKeys: ["supplier.name", "amount", "method", "reference", "paidAt", "allocations.length", "status"], title: "Supplier payments", description: "Record supplier payments and allocate amounts against supplier bills. Reversals are audited and do not delete history.", columns: [
+  "supplier-payments": { tableColumnKeys: ["supplier.name", "amount", "method", "reference", "paidAt", "allocations.length", "status"], showDescription: true, title: "Supplier payments", description: "Reversals are audited and preserve the original payment history.", columns: [
     { key: "supplier.name", label: "Supplier" }, { key: "supplier.company", label: "Supplier company" }, { key: "amount", label: "Amount" },
     { key: "method", label: "Method" }, { key: "reference", label: "UTR / reference" }, { key: "paidAt", label: "Date paid" },
     { key: "allocations.length", label: "Bill allocations" }, { key: "notes", label: "Notes" }, { key: "status", label: "Status" }, { key: "createdAt", label: "Created" },
   ], empty: "No supplier payments recorded.", writable: true },
-  inventory: { tableColumnKeys: ["createdAt", "product.name", "product.sku", "movementType", "quantity", "unitCost", "referenceType"], title: "Stock movement ledger", description: "Append-only inventory activity. Manual adjustments and stock issues are transaction-safe and cannot drive stock below zero.", columns: [
+  inventory: { tableColumnKeys: ["createdAt", "product.name", "product.sku", "movementType", "quantity", "unitCost", "referenceType"], showDescription: true, title: "Stock movement ledger", description: "Stock changes are recorded in the ledger and cannot reduce inventory below zero.", columns: [
     { key: "createdAt", label: "Date" }, { key: "product.name", label: "Product" }, { key: "product.sku", label: "SKU" },
     { key: "movementType", label: "Movement" }, { key: "quantity", label: "Quantity" }, { key: "unitCost", label: "Unit cost" }, { key: "referenceType", label: "Reference type" }, { key: "notes", label: "Notes" },
   ], empty: "No inventory movements recorded yet.", writable: true },
@@ -85,7 +85,7 @@ const moduleConfig: Record<string, { title: string; description: string; columns
     { key: "description", label: "Description" }, { key: "customer.name", label: "Customer" }, { key: "supplier.name", label: "Supplier" },
     { key: "debit", label: "Debit" }, { key: "credit", label: "Credit" }, { key: "createdAt", label: "Created" },
   ], empty: "No ledger entries have been posted.", writable: false },
-  permissions: { tableColumnKeys: ["role", "moduleKey", "actionKey", "granted", "updatedAt"], title: "Team & permissions", description: "Configure tenant-scoped module/action permissions for staff roles. Owners retain full access; staff cannot grant themselves permissions.", columns: [
+  permissions: { tableColumnKeys: ["role", "moduleKey", "actionKey", "granted", "updatedAt"], showDescription: true, title: "Team & permissions", description: "Owners retain full access; staff cannot grant themselves permissions.", columns: [
     { key: "role", label: "Role" }, { key: "moduleKey", label: "Module" }, { key: "actionKey", label: "Action" },
     { key: "granted", label: "Granted" }, { key: "updatedAt", label: "Updated" },
   ], empty: "No permission overrides set. Role defaults remain in effect until an explicit override is saved.", writable: true },
@@ -519,7 +519,7 @@ export function OperationsModule({ resource, owner, canUpdate = false, canDelete
 
   return (
     <div className="workspace-admin-page">
-      <header className="crm-module-heading">
+      <header className={"crm-module-heading" + (config.showDescription ? "" : " is-compact")}>
         <div><p className="dashboard-eyebrow">BUSINESS OPERATIONS</p><h1>{config.title}</h1><p className="dashboard-subtitle">{config.description}</p></div>
         <div className="operations-heading-actions">
           <button type="button" className="crm-secondary-button" onClick={() => { setLoading(true); setError(""); void loadRows(); void loadCatalogs(); }} disabled={loading}><RefreshCw size={15} />Refresh</button>
