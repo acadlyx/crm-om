@@ -94,8 +94,9 @@ function safeBlocks(value: unknown, fallback: DocumentBlockKey[], allowEmpty = f
       items.push(item as DocumentBlockKey);
     }
   }
-  if (!allowEmpty && items.length === 0) return [...fallback];
-  return items;
+  if (allowEmpty) return items;
+  if (items.length === 0) return [...fallback];
+  return [...items, ...fallback.filter((key) => !seen.has(key))];
 }
 
 export function defaultDocumentTemplate(kind: DocumentKind): DocumentTemplate {
