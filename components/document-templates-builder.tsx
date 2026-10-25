@@ -122,7 +122,7 @@ export function DocumentTemplatesBuilder({
   }
 
   const visibleBlocks = template.blockOrder.filter((key) => !template.hiddenBlocks.includes(key));
-  const paperStyle = { borderColor: template.accentColor } as const;
+  const paperStyle = { borderColor: template.accentColor, fontFamily: template.fontFamily === "TimesRoman" ? "Georgia, 'Times New Roman', serif" : template.fontFamily === "Courier" ? "'Courier New', monospace" : "Arial, Helvetica, sans-serif", fontSize: template.fontSize } as const;
   const headingStyle = { color: template.accentColor } as const;
 
   return (
@@ -159,6 +159,7 @@ export function DocumentTemplatesBuilder({
             <div className="document-editor-fields">
               <label className="document-field document-field-full">Document title<input maxLength={80} value={template.title} onChange={(e) => update({ title: e.target.value })} /></label>
               <label className="document-field">Brand colour<span className="document-color-input"><input aria-label="Brand colour" type="color" value={template.accentColor} onChange={(e) => update({ accentColor: e.target.value })} /><code>{template.accentColor}</code></span></label>
+              <label className="document-field">Typography<select value={template.fontFamily} onChange={(e) => update({ fontFamily: e.target.value as DocumentTemplate["fontFamily"] })}><option value="Helvetica">Sans serif · clean</option><option value="TimesRoman">Serif · editorial</option><option value="Courier">Monospaced · technical</option></select></label>
               <label className="document-field">Header composition<select value={template.headerStyle} onChange={(e) => update({ headerStyle: e.target.value as DocumentTemplate["headerStyle"] })}><option value="band">Tinted band</option><option value="rule">Signature rule</option><option value="plain">Clean / minimal</option></select></label>
               <label className="document-field">Paper size<select value={template.paperSize} onChange={(e) => update({ paperSize: e.target.value as DocumentTemplate["paperSize"] })}><option value="A4">A4</option><option value="LETTER">US Letter</option></select></label>
               <label className="document-field">Orientation<select value={template.orientation} onChange={(e) => update({ orientation: e.target.value as DocumentTemplate["orientation"] })}><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>
