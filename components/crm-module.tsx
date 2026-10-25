@@ -275,7 +275,7 @@ export function CrmModule({
 
   return (
     <div className="crm-module-page">
-      <header className="crm-module-heading">
+      <header className="crm-module-heading is-compact">
         <div><p className="dashboard-eyebrow">BUSINESS WORKSPACE</p><h1>{title}</h1><p className="dashboard-subtitle">{description}</p></div>
         <button type="button" className="brand-button crm-add-button" onClick={() => { setOpen((value) => !value); setError(""); setNotice(""); }}>
           {open ? <X size={17} /> : <Plus size={17} />}{open ? "Close form" : "Add " + (recordLabel || title.replace(/s$/, ""))}
