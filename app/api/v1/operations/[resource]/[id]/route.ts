@@ -884,14 +884,14 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
         const row = await db.salesOrder.findFirst({
           where: { id, tenantId },
           include: {
-            customer: { select: { name: true, company: true, email: true, phone: true } },
-            items: { orderBy: { createdAt: "asc" }, include: { product: { select: { sku: true, name: true, unit: true } } } },
+            customer: { select: { tenantId: true, name: true, company: true, email: true, phone: true } },
+            items: { orderBy: { createdAt: "asc" }, include: { product: { select: { tenantId: true, sku: true, name: true, unit: true } } } },
             deliveries: { where: { tenantId }, orderBy: { createdAt: "desc" }, take: 10, select: { deliveryNumber: true, status: true, scheduledAt: true, completedAt: true } },
             invoices: { where: { tenantId }, select: { id: true, invoiceNumber: true, status: true, total: true } },
           },
         });
         if (row) detail = {
-          type: "Sales order", title: row.orderNumber, reference: row.customer.name, status: row.status,
+          type: "Sales order", title: row.orderNumber, reference: row.customer.tenantId === tenantId ? row.customer.name : null, status: row.status,
           sections: [
             detailSection("Order details", [
               detailField("Status", row.status, "status"), detailField("Order date", row.orderDate, "date"),
@@ -902,12 +902,12 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
               detailField("Last updated", row.updatedAt, "datetime"),
             ]),
             detailSection("Customer", [
-              detailField("Name", row.customer.name), detailField("Company", row.customer.company),
-              detailField("Email", row.customer.email), detailField("Phone", row.customer.phone),
+              detailField("Name", row.customer.tenantId === tenantId ? row.customer.name : null), detailField("Company", row.customer.tenantId === tenantId ? row.customer.company : null),
+              detailField("Email", row.customer.tenantId === tenantId ? row.customer.email : null), detailField("Phone", row.customer.tenantId === tenantId ? row.customer.phone : null),
             ]),
             detailSection("Order items", row.items.flatMap((entry, index) => [
-              detailField((index + 1) + ". " + entry.product.name + " · " + entry.product.sku,
-                Number(entry.quantity) + " " + entry.product.unit + " · " +
+              detailField((index + 1) + ". " + (entry.product.tenantId === tenantId ? entry.product.name + " · " + entry.product.sku : "Order item"),
+                Number(entry.quantity) + " " + (entry.product.tenantId === tenantId ? entry.product.unit : "units") + " · " +
                 new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(Number(entry.unitPrice)) + " per unit"),
               detailField("Line total", entry.lineTotal, "money"),
             ])),
@@ -927,14 +927,14 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
         const row = await db.purchaseOrder.findFirst({
           where: { id, tenantId },
           include: {
-            supplier: { select: { name: true, company: true, email: true, phone: true } },
-            items: { orderBy: { createdAt: "asc" }, include: { product: { select: { sku: true, name: true, unit: true } } } },
+            supplier: { select: { tenantId: true, name: true, company: true, email: true, phone: true } },
+            items: { orderBy: { createdAt: "asc" }, include: { product: { select: { tenantId: true, sku: true, name: true, unit: true } } } },
             receipts: { where: { tenantId }, orderBy: { createdAt: "desc" }, take: 10, select: { receiptNumber: true, status: true, receivedAt: true } },
             bills: { where: { tenantId }, orderBy: { createdAt: "desc" }, take: 10, select: { billNumber: true, status: true, total: true, dueDate: true } },
           },
         });
         if (row) detail = {
-          type: "Purchase order", title: row.orderNumber, reference: row.supplier.name, status: row.status,
+          type: "Purchase order", title: row.orderNumber, reference: row.supplier.tenantId === tenantId ? row.supplier.name : null, status: row.status,
           sections: [
             detailSection("Order details", [
               detailField("Status", row.status, "status"), detailField("Order date", row.orderDate, "date"),
@@ -944,12 +944,12 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
               detailField("Last updated", row.updatedAt, "datetime"),
             ]),
             detailSection("Supplier", [
-              detailField("Name", row.supplier.name), detailField("Company", row.supplier.company),
-              detailField("Email", row.supplier.email), detailField("Phone", row.supplier.phone),
+              detailField("Name", row.supplier.tenantId === tenantId ? row.supplier.name : null), detailField("Company", row.supplier.tenantId === tenantId ? row.supplier.company : null),
+              detailField("Email", row.supplier.tenantId === tenantId ? row.supplier.email : null), detailField("Phone", row.supplier.tenantId === tenantId ? row.supplier.phone : null),
             ]),
             detailSection("Purchase items", row.items.flatMap((entry, index) => [
-              detailField((index + 1) + ". " + entry.product.name + " · " + entry.product.sku,
-                Number(entry.quantity) + " " + entry.product.unit + " · unit cost " +
+              detailField((index + 1) + ". " + (entry.product.tenantId === tenantId ? entry.product.name + " · " + entry.product.sku : "Purchase item"),
+                Number(entry.quantity) + " " + (entry.product.tenantId === tenantId ? entry.product.unit : "units") + " · unit cost " +
                 new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(Number(entry.unitCost))),
               detailField("Line total", entry.lineTotal, "money"),
               detailField("Quantity received", entry.receivedQuantity, "quantity"),
@@ -966,21 +966,21 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
         const row = await db.goodsReceipt.findFirst({
           where: { id, tenantId },
           include: {
-            purchaseOrder: { select: { orderNumber: true, supplier: { select: { name: true } } } },
-            items: { include: { product: { select: { sku: true, name: true, unit: true } } } },
+            purchaseOrder: { select: { tenantId: true, orderNumber: true, supplier: { select: { tenantId: true, name: true } } } },
+            items: { include: { product: { select: { tenantId: true, sku: true, name: true, unit: true } } } },
           },
         });
         if (row) detail = {
-          type: "Goods receipt", title: row.receiptNumber, reference: row.purchaseOrder.orderNumber, status: row.status,
+          type: "Goods receipt", title: row.receiptNumber, reference: row.purchaseOrder.tenantId === tenantId ? row.purchaseOrder.orderNumber : null, status: row.status,
           sections: [
             detailSection("Receipt details", [
               detailField("Status", row.status, "status"), detailField("Received at", row.receivedAt, "datetime"),
-              detailField("Purchase order", row.purchaseOrder.orderNumber), detailField("Supplier", row.purchaseOrder.supplier.name),
+              detailField("Purchase order", row.purchaseOrder.tenantId === tenantId ? row.purchaseOrder.orderNumber : null), detailField("Supplier", row.purchaseOrder.tenantId === tenantId && row.purchaseOrder.supplier.tenantId === tenantId ? row.purchaseOrder.supplier.name : null),
               detailField("Notes", row.notes), detailField("Created", row.createdAt, "datetime"),
             ]),
             detailSection("Received items", row.items.flatMap((entry, index) => [
-              detailField((index + 1) + ". " + entry.product.name + " · " + entry.product.sku,
-                Number(entry.quantity) + " " + entry.product.unit + " · unit cost " +
+              detailField((index + 1) + ". " + (entry.product.tenantId === tenantId ? entry.product.name + " · " + entry.product.sku : "Received item"),
+                Number(entry.quantity) + " " + (entry.product.tenantId === tenantId ? entry.product.unit : "units") + " · unit cost " +
                 new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(Number(entry.unitCost))),
               detailField("Received value", Number(entry.quantity) * Number(entry.unitCost), "money"),
             ])),
@@ -992,28 +992,28 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
         const row = await db.delivery.findFirst({
           where: { id, tenantId },
           include: {
-            order: { select: { orderNumber: true, customer: { select: { name: true, company: true } } } },
-            assignedUser: { select: { name: true, role: true } },
-            items: { include: { product: { select: { sku: true, name: true, unit: true } } } },
+            order: { select: { tenantId: true, orderNumber: true, customer: { select: { tenantId: true, name: true, company: true } } } },
+            assignedUser: { select: { tenantId: true, name: true, role: true } },
+            items: { include: { product: { select: { tenantId: true, sku: true, name: true, unit: true } } } },
           },
         });
         if (row) detail = {
-          type: "Delivery", title: row.deliveryNumber, reference: row.order.orderNumber, status: row.status,
+          type: "Delivery", title: row.deliveryNumber, reference: row.order.tenantId === tenantId ? row.order.orderNumber : null, status: row.status,
           sections: [
             detailSection("Delivery details", [
               detailField("Status", row.status, "status"), detailField("Scheduled", row.scheduledAt, "datetime"),
               detailField("Dispatched", row.dispatchedAt, "datetime"), detailField("Completed", row.completedAt, "datetime"),
-              detailField("Assigned to", row.assignedUser ? row.assignedUser.name + " · " + enumText(row.assignedUser.role) : null),
+              detailField("Assigned to", row.assignedUser?.tenantId === tenantId ? row.assignedUser.name + " · " + enumText(row.assignedUser.role) : null),
               detailField("Proof of delivery", row.proofOfDelivery), detailField("Failure reason", row.failureReason),
               detailField("Created", row.createdAt, "datetime"), detailField("Last updated", row.updatedAt, "datetime"),
             ]),
             detailSection("Sales order and customer", [
-              detailField("Sales order", row.order.orderNumber),
-              detailField("Customer", [row.order.customer.name, row.order.customer.company].filter(Boolean).join(" · ")),
+              detailField("Sales order", row.order.tenantId === tenantId ? row.order.orderNumber : null),
+              detailField("Customer", row.order.tenantId === tenantId && row.order.customer.tenantId === tenantId ? [row.order.customer.name, row.order.customer.company].filter(Boolean).join(" · ") : null),
             ]),
             detailSection("Delivery items", row.items.flatMap((entry, index) => [
-              detailField((index + 1) + ". " + entry.product.name + " · " + entry.product.sku,
-                Number(entry.quantity) + " " + entry.product.unit),
+              detailField((index + 1) + ". " + (entry.product.tenantId === tenantId ? entry.product.name + " · " + entry.product.sku : "Delivery item"),
+                Number(entry.quantity) + " " + (entry.product.tenantId === tenantId ? entry.product.unit : "units")),
             ])),
           ],
         };
@@ -1023,12 +1023,12 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
         const row = await db.customerReceipt.findFirst({
           where: { id, tenantId },
           include: {
-            customer: { select: { name: true, company: true, email: true, phone: true, addresses: true } },
-            allocations: { include: { invoice: { select: { id: true, invoiceNumber: true, total: true } } } },
+            customer: { select: { tenantId: true, name: true, company: true, email: true, phone: true, addresses: true } },
+            allocations: { include: { invoice: { select: { id: true, tenantId: true, invoiceNumber: true, total: true } } } },
           },
         });
         if (row) detail = {
-          type: "Customer receipt", title: row.receiptNumber, reference: row.customer.name, status: row.status,
+          type: "Customer receipt", title: row.receiptNumber, reference: row.customer.tenantId === tenantId ? row.customer.name : null, status: row.status,
           sections: [
             detailSection("Receipt details", [
               detailField("Status", row.status, "status"), detailField("Amount received", row.amount, "money"),
@@ -1037,11 +1037,11 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
               detailField("Created", row.createdAt, "datetime"),
             ]),
             detailSection("Customer", [
-              detailField("Name", row.customer.name), detailField("Company", row.customer.company),
-              detailField("Email", row.customer.email), detailField("Phone", row.customer.phone),
-              detailField("Address", addressText(row.customer.addresses)),
+              detailField("Name", row.customer.tenantId === tenantId ? row.customer.name : null), detailField("Company", row.customer.tenantId === tenantId ? row.customer.company : null),
+              detailField("Email", row.customer.tenantId === tenantId ? row.customer.email : null), detailField("Phone", row.customer.tenantId === tenantId ? row.customer.phone : null),
+              detailField("Address", row.customer.tenantId === tenantId ? addressText(row.customer.addresses) : null),
             ]),
-            detailSection("Invoice allocations", row.allocations.map((entry) =>
+            detailSection("Invoice allocations", row.allocations.filter((entry) => entry.invoice.tenantId === tenantId).map((entry) =>
               detailField(entry.invoice.invoiceNumber, entry.amount, "money",
                 "/operations/invoices/" + encodeURIComponent(entry.invoice.id)))),
           ],
@@ -1052,26 +1052,26 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
         const row = await db.supplierBill.findFirst({
           where: { id, tenantId },
           include: {
-            supplier: { select: { name: true, company: true, email: true, phone: true, address: true, taxId: true } },
-            purchaseOrder: { select: { orderNumber: true } },
-            allocations: { include: { payment: { select: { amount: true, method: true, reference: true, status: true, paidAt: true } } } },
+            supplier: { select: { tenantId: true, name: true, company: true, email: true, phone: true, address: true, taxId: true } },
+            purchaseOrder: { select: { tenantId: true, orderNumber: true } },
+            allocations: { include: { payment: { select: { tenantId: true, amount: true, method: true, reference: true, status: true, paidAt: true } } } },
           },
         });
         if (row) detail = {
-          type: "Supplier bill", title: row.billNumber, reference: row.supplier.name, status: row.status,
+          type: "Supplier bill", title: row.billNumber, reference: row.supplier.tenantId === tenantId ? row.supplier.name : null, status: row.status,
           sections: [
             detailSection("Bill details", [
               detailField("Status", row.status, "status"), detailField("Issue date", row.issueDate, "date"),
               detailField("Due date", row.dueDate, "date"), detailField("Bill total", row.total, "money"),
-              detailField("Notes", row.notes), detailField("Purchase order", row.purchaseOrder?.orderNumber),
+              detailField("Notes", row.notes), detailField("Purchase order", row.purchaseOrder?.tenantId === tenantId ? row.purchaseOrder.orderNumber : null),
               detailField("Created", row.createdAt, "datetime"), detailField("Last updated", row.updatedAt, "datetime"),
             ]),
             detailSection("Supplier", [
-              detailField("Name", row.supplier.name), detailField("Company", row.supplier.company),
-              detailField("Email", row.supplier.email), detailField("Phone", row.supplier.phone),
-              detailField("Address", row.supplier.address), detailField("Tax / GST ID", row.supplier.taxId),
+              detailField("Name", row.supplier.tenantId === tenantId ? row.supplier.name : null), detailField("Company", row.supplier.tenantId === tenantId ? row.supplier.company : null),
+              detailField("Email", row.supplier.tenantId === tenantId ? row.supplier.email : null), detailField("Phone", row.supplier.tenantId === tenantId ? row.supplier.phone : null),
+              detailField("Address", row.supplier.tenantId === tenantId ? row.supplier.address : null), detailField("Tax / GST ID", row.supplier.tenantId === tenantId ? row.supplier.taxId : null),
             ]),
-            detailSection("Allocated payments", row.allocations.flatMap((entry) => [
+            detailSection("Allocated payments", row.allocations.filter((entry) => entry.payment.tenantId === tenantId).flatMap((entry) => [
               detailField([enumText(entry.payment.method), entry.payment.reference, enumText(entry.payment.status)].filter(Boolean).join(" · ") || "Payment", entry.amount, "money"),
               detailField("Payment date", entry.payment.paidAt, "datetime"),
             ])),
@@ -1083,12 +1083,12 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
         const row = await db.supplierPayment.findFirst({
           where: { id, tenantId },
           include: {
-            supplier: { select: { name: true, company: true, email: true, phone: true } },
-            allocations: { include: { bill: { select: { billNumber: true, total: true, dueDate: true, status: true } } } },
+            supplier: { select: { tenantId: true, name: true, company: true, email: true, phone: true } },
+            allocations: { include: { bill: { select: { tenantId: true, billNumber: true, total: true, dueDate: true, status: true } } } },
           },
         });
         if (row) detail = {
-          type: "Supplier payment", title: row.reference || "Supplier payment", reference: row.supplier.name, status: row.status,
+          type: "Supplier payment", title: row.reference || "Supplier payment", reference: row.supplier.tenantId === tenantId ? row.supplier.name : null, status: row.status,
           sections: [
             detailSection("Payment details", [
               detailField("Status", row.status, "status"), detailField("Amount paid", row.amount, "money"),
@@ -1097,10 +1097,10 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
               detailField("Created", row.createdAt, "datetime"),
             ]),
             detailSection("Supplier", [
-              detailField("Name", row.supplier.name), detailField("Company", row.supplier.company),
-              detailField("Email", row.supplier.email), detailField("Phone", row.supplier.phone),
+              detailField("Name", row.supplier.tenantId === tenantId ? row.supplier.name : null), detailField("Company", row.supplier.tenantId === tenantId ? row.supplier.company : null),
+              detailField("Email", row.supplier.tenantId === tenantId ? row.supplier.email : null), detailField("Phone", row.supplier.tenantId === tenantId ? row.supplier.phone : null),
             ]),
-            detailSection("Bill allocations", row.allocations.map((entry) =>
+            detailSection("Bill allocations", row.allocations.filter((entry) => entry.bill.tenantId === tenantId).map((entry) =>
               detailField(entry.bill.billNumber + " · " + enumText(entry.bill.status), entry.amount, "money"))),
           ],
         };
@@ -1109,12 +1109,12 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
       case "inventory": {
         const row = await db.inventoryMovement.findFirst({
           where: { id, tenantId },
-          include: { product: { select: { sku: true, name: true, unit: true } } },
+          include: { product: { select: { tenantId: true, sku: true, name: true, unit: true } } },
         });
         if (row) detail = {
-          type: "Stock movement", title: row.product.name, reference: row.product.sku, status: enumText(row.movementType),
+          type: "Stock movement", title: row.product.tenantId === tenantId ? row.product.name : "Stock movement", reference: row.product.tenantId === tenantId ? row.product.sku : null, status: enumText(row.movementType),
           sections: [detailSection("Movement details", [
-            detailField("Product", row.product.name), detailField("SKU", row.product.sku),
+            detailField("Product", row.product.tenantId === tenantId ? row.product.name : null), detailField("SKU", row.product.tenantId === tenantId ? row.product.sku : null),
             detailField("Movement type", row.movementType, "status"), detailField("Quantity", row.quantity, "quantity"),
             detailField("Unit cost", row.unitCost, "money"), detailField("Reference type", enumText(row.referenceType)),
             detailField("Notes / reason", row.notes), detailField("Recorded", row.createdAt, "datetime"),
@@ -1126,8 +1126,8 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
         const row = await db.customerFollowUp.findFirst({
           where: { id, tenantId },
           include: {
-            customer: { select: { name: true, company: true, email: true, phone: true } },
-            assignedUser: { select: { name: true, role: true } },
+            customer: { select: { tenantId: true, name: true, company: true, email: true, phone: true } },
+            assignedUser: { select: { tenantId: true, name: true, role: true } },
           },
         });
         if (row) detail = {
@@ -1136,12 +1136,12 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
             detailSection("Follow-up details", [
               detailField("Status", row.status, "status"), detailField("Due date", row.dueAt, "datetime"),
               detailField("Channel", enumText(row.channel)), detailField("Notes", row.notes),
-              detailField("Assigned staff member", row.assignedUser ? row.assignedUser.name + " · " + enumText(row.assignedUser.role) : null),
+              detailField("Assigned staff member", row.assignedUser?.tenantId === tenantId ? row.assignedUser.name + " · " + enumText(row.assignedUser.role) : null),
               detailField("Created", row.createdAt, "datetime"), detailField("Last updated", row.updatedAt, "datetime"),
             ]),
             detailSection("Customer", [
-              detailField("Name", row.customer.name), detailField("Company", row.customer.company),
-              detailField("Email", row.customer.email), detailField("Phone", row.customer.phone),
+              detailField("Name", row.customer.tenantId === tenantId ? row.customer.name : null), detailField("Company", row.customer.tenantId === tenantId ? row.customer.company : null),
+              detailField("Email", row.customer.tenantId === tenantId ? row.customer.email : null), detailField("Phone", row.customer.tenantId === tenantId ? row.customer.phone : null),
             ]),
           ],
         };
@@ -1151,13 +1151,13 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
         const row = await db.ledgerEntry.findFirst({
           where: { id, tenantId },
           include: {
-            customer: { select: { name: true, company: true } },
-            supplier: { select: { name: true, company: true } },
+            customer: { select: { tenantId: true, name: true, company: true } },
+            supplier: { select: { tenantId: true, name: true, company: true } },
           },
         });
         if (row) detail = {
           type: "Ledger entry", title: row.description,
-          reference: row.customer?.name || row.supplier?.name || null, status: "Posted",
+          reference: row.customer?.tenantId === tenantId ? row.customer.name : row.supplier?.tenantId === tenantId ? row.supplier.name : null, status: "Posted",
           sections: [
             detailSection("Accounting entry", [
               detailField("Description", row.description), detailField("Entry type", enumText(row.entryType)),
@@ -1166,8 +1166,8 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
               detailField("Created", row.createdAt, "datetime"),
             ]),
             detailSection("Related party", [
-              detailField("Customer", row.customer ? [row.customer.name, row.customer.company].filter(Boolean).join(" · ") : null),
-              detailField("Supplier", row.supplier ? [row.supplier.name, row.supplier.company].filter(Boolean).join(" · ") : null),
+              detailField("Customer", row.customer?.tenantId === tenantId ? [row.customer.name, row.customer.company].filter(Boolean).join(" · ") : null),
+              detailField("Supplier", row.supplier?.tenantId === tenantId ? [row.supplier.name, row.supplier.company].filter(Boolean).join(" · ") : null),
             ]),
           ],
         };
