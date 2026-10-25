@@ -29,18 +29,28 @@ export async function PUT(request: NextRequest) {
   try {
     const data = await db.$transaction(async (tx) => {
       const { invoiceIdentity, preferences, ...fields } = parsed.data;
+      const existing = await tx.businessSettings.findUnique({ where: { tenantId: access.user.tenantId! } });
+      const currentPreferences = existing?.preferences && typeof existing.preferences === "object" && !Array.isArray(existing.preferences)
+        ? existing.preferences as Record<string, unknown>
+        : {};
+      const incomingPreferences = preferences as Record<string, unknown>;
+      const mergedPreferences: Record<string, unknown> = { ...currentPreferences, ...incomingPreferences };
+      // The dedicated document-template editor owns this key. Do not overwrite newer layouts with a stale business-settings form.
+      if (Object.prototype.hasOwnProperty.call(currentPreferences, "documentTemplates")) {
+        mergedPreferences.documentTemplates = currentPreferences.documentTemplates;
+      }
       const row = await tx.businessSettings.upsert({
         where: { tenantId: access.user.tenantId! },
         create: {
           ...fields,
           tenantId: access.user.tenantId!,
           invoiceIdentity: invoiceIdentity as Prisma.InputJsonValue,
-          preferences: preferences as Prisma.InputJsonValue,
+          preferences: mergedPreferences as Prisma.InputJsonValue,
         },
         update: {
           ...fields,
           invoiceIdentity: invoiceIdentity as Prisma.InputJsonValue,
-          preferences: preferences as Prisma.InputJsonValue,
+          preferences: mergedPreferences as Prisma.InputJsonValue,
         },
       });
       await tx.auditLog.create({

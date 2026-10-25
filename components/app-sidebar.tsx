@@ -93,6 +93,7 @@ export function AppSidebar({ branding, role, tenantId }: { branding: Branding; r
             <p className="sidebar-section-label">OWNER CONTROLS</p>
             <SidebarLink href="/operations/team"><Users size={17} aria-hidden="true" />Team management</SidebarLink>
             <SidebarLink href="/operations/permissions"><ShieldCheck size={17} aria-hidden="true" />Permissions</SidebarLink>
+            <SidebarLink href="/settings/document-templates"><FileText size={17} aria-hidden="true" />Document templates</SidebarLink>
             <SidebarLink href="/settings/business"><Building2 size={17} aria-hidden="true" />Business settings</SidebarLink>
           </>}
         </>}

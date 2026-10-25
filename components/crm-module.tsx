@@ -348,7 +348,7 @@ export function CrmModule({
         </div>
         {filteredRows.length ? (
           <div className="crm-table-wrap"><table className="crm-table">
-            <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}{workflow && canUpdate && <th>{workflow.label}</th>}{(canDelete || (resource === "payments" && owner) || (resource === "customers" && canUpdate)) && <th>Actions</th>}</tr></thead>
+            <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}{workflow && canUpdate && <th>{workflow.label}</th>}{(canDelete || resource === "invoices" || (resource === "payments" && owner) || (resource === "customers" && canUpdate)) && <th>Actions</th>}</tr></thead>
             <tbody>{filteredRows.slice(0, visibleCount).map((row) => (
               <tr key={row.id}>
                 {columns.map((column, index) => {
@@ -359,7 +359,8 @@ export function CrmModule({
                 {workflow && canUpdate && <td><select className="crm-workflow-select" value={String(row[workflow.field] || "")} disabled={busyRow === row.id} onChange={(event) => updateWorkflow(row, event.target.value)} aria-label={workflow.label + " for " + String(row[columns[0]?.key] || "record")}>
                   {workflow.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>{busyRow === row.id && <LoaderCircle size={13} className="workspace-spinner crm-inline-spinner" />}</td>}
-                {(canDelete || (resource === "payments" && owner) || (resource === "customers" && canUpdate)) && <td><div className="operations-row-actions">
+                {(canDelete || resource === "invoices" || (resource === "payments" && owner) || (resource === "customers" && canUpdate)) && <td><div className="operations-row-actions">
+                  {resource === "invoices" && <a className="crm-secondary-button" href={"/api/v1/operations/invoices/" + encodeURIComponent(row.id) + "/pdf"} download><ArrowDownToLine size={14} />Download PDF</a>}
                   {resource === "customers" && canUpdate && <button type="button" className="crm-secondary-button" onClick={() => { setError(""); setNotice(""); setEditingCustomer(row); }}>Edit profile</button>}
                   {resource === "payments" && owner && (row.status === "POSTED"
                     ? <button type="button" className="crm-secondary-button is-danger" disabled={busyRow === row.id} onClick={() => void reversePayment(row)}>{busyRow === row.id ? <LoaderCircle size={13} className="workspace-spinner" /> : "Reverse payment"}</button>

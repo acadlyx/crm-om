@@ -818,7 +818,19 @@ function RowActions({ resource, row, owner, canUpdate, onChange, onUpdate, onInv
     </a>
     {owner && row.status === "POSTED" && <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"REVERSED")}>Reverse</button>}
   </div>;
-  if (["goods-receipts","supplier-payments"].includes(resource) && row.status === "POSTED" && owner) {
+  if (resource === "supplier-bills") return <div className="operations-row-actions">
+    <a className="crm-secondary-button" href={"/api/v1/operations/supplier-bills/" + encodeURIComponent(row.id) + "/pdf"} download>
+      <ArrowDownToLine size={14} /> Download PDF
+    </a>
+  </div>;
+  if (resource === "supplier-payments") return <div className="operations-row-actions">
+    <a className="crm-secondary-button" href={"/api/v1/operations/supplier-payments/" + encodeURIComponent(row.id) + "/pdf"} download>
+      <ArrowDownToLine size={14} /> Download PDF
+    </a>
+    {owner && row.status === "POSTED" && <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"REVERSED")}>Reverse</button>}
+    {row.status === "REVERSED" && <span className="crm-pill crm-pill-overdue">Reversed</span>}
+  </div>;
+  if (resource === "goods-receipts" && row.status === "POSTED" && owner) {
     return <button type="button" className="crm-secondary-button is-danger" onClick={()=>onChange(row,"REVERSED")}>Reverse</button>;
   }
   if (resource === "customer-follow-ups" && canUpdate && row.status === "OPEN") return <div className="operations-row-actions">
