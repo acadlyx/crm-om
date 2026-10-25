@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
+import { RecordDetailsAction } from "@/components/record-details-action";
 import { useRouter } from "next/navigation";
 import {
   ArrowDownToLine, ArrowRight, ArrowUpRight, CheckCircle2, CircleAlert, Eye, LoaderCircle,
@@ -348,7 +349,7 @@ export function CrmModule({
         </div>
         {filteredRows.length ? (
           <div className="crm-table-wrap"><table className="crm-table">
-            <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}{workflow && canUpdate && <th>{workflow.label}</th>}{(canDelete || resource === "invoices" || (resource === "payments" && owner) || (resource === "customers" && canUpdate)) && <th>Actions</th>}</tr></thead>
+            <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}{workflow && canUpdate && <th>{workflow.label}</th>}<th>Actions</th></tr></thead>
             <tbody>{filteredRows.slice(0, visibleCount).map((row) => (
               <tr key={row.id}>
                 {columns.map((column, index) => {
@@ -359,14 +360,16 @@ export function CrmModule({
                 {workflow && canUpdate && <td><select className="crm-workflow-select" value={String(row[workflow.field] || "")} disabled={busyRow === row.id} onChange={(event) => updateWorkflow(row, event.target.value)} aria-label={workflow.label + " for " + String(row[columns[0]?.key] || "record")}>
                   {workflow.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>{busyRow === row.id && <LoaderCircle size={13} className="workspace-spinner crm-inline-spinner" />}</td>}
-                {(canDelete || resource === "invoices" || (resource === "payments" && owner) || (resource === "customers" && canUpdate)) && <td><div className="operations-row-actions">
+                <td><div className="operations-row-actions">
+                  {resource !== "invoices" && <RecordDetailsAction endpoint={"/api/v1/crm/" + encodeURIComponent(resource) + "/" + encodeURIComponent(row.id)} recordLabel={String(row[columns[0]?.key] || title)} />}
+                  
                   {resource === "invoices" && <><a className="crm-secondary-button" href={"/operations/invoices/" + encodeURIComponent(row.id)}><Eye size={14} />View invoice</a><a className="crm-secondary-button" href={"/api/v1/operations/invoices/" + encodeURIComponent(row.id) + "/pdf"} download><ArrowDownToLine size={14} />Download PDF</a></>}
                   {resource === "customers" && canUpdate && <button type="button" className="crm-secondary-button" onClick={() => { setError(""); setNotice(""); setEditingCustomer(row); }}>Edit profile</button>}
                   {resource === "payments" && owner && (row.status === "POSTED"
                     ? <button type="button" className="crm-secondary-button is-danger" disabled={busyRow === row.id} onClick={() => void reversePayment(row)}>{busyRow === row.id ? <LoaderCircle size={13} className="workspace-spinner" /> : "Reverse payment"}</button>
                     : <span className="crm-pill crm-pill-overdue">Reversed</span>)}
                   {canDelete && <button type="button" className="crm-secondary-button is-danger" disabled={busyRow === row.id} onClick={() => void deleteRecord(row)}>{busyRow === row.id ? <LoaderCircle size={13} className="workspace-spinner" /> : <Trash2 size={14} />}Delete</button>}
-                </div></td>}
+                </div></td>
               </tr>
             ))}</tbody>
           </table></div>
