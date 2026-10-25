@@ -294,7 +294,6 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
 
   const tenantId = access.tenantId;
   let detail: RecordDetail | null = null;
-  const shortDate = (value: Date | null | undefined) => value ? value.toISOString() : null;
   const enumText = (value: string | null | undefined) => value ? value.replaceAll("_", " ") : null;
 
   try {
@@ -323,12 +322,17 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
             ]),
             detailSection("Recent invoices", row.invoices.map((entry) =>
               detailField(entry.invoiceNumber, entry.total, "money", "/operations/invoices/" + encodeURIComponent(entry.id)))),
-            detailSection("Recent opportunities", row.deals.map((entry) =>
-              detailField(entry.title, enumText(entry.stage) + " · " + new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(Number(entry.value)) + " (workspace currency"))),
-            detailSection("Recent tasks", row.tasks.map((entry) =>
-              detailField(entry.title, [enumText(entry.status), entry.dueDate ? "Due " + shortDate(entry.dueDate) : null].filter(Boolean).join(" · ") || null))),
-            detailSection("Recent follow-ups", row.followUps.map((entry) =>
-              detailField(entry.title, [enumText(entry.status), "Due " + shortDate(entry.dueAt)].filter(Boolean).join(" · "))),
+            detailSection("Recent opportunities", row.deals.flatMap((entry) => [
+              detailField(entry.title + " · " + enumText(entry.stage), entry.value, "money"),
+            ])),
+            detailSection("Recent tasks", row.tasks.flatMap((entry) => [
+              detailField(entry.title, entry.status, "status"),
+              detailField("Due · " + entry.title, entry.dueDate, "date"),
+            ])),
+            detailSection("Recent follow-ups", row.followUps.flatMap((entry) => [
+              detailField(entry.title, entry.status, "status"),
+              detailField("Due · " + entry.title, entry.dueAt, "datetime"),
+            ])),
           ],
         };
         break;
@@ -350,7 +354,7 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
               detailField("Created", row.createdAt, "datetime"), detailField("Last updated", row.updatedAt, "datetime"),
             ]),
             detailSection("Related opportunities", row.deals.map((entry) =>
-              detailField(entry.title, enumText(entry.stage) + " · " + new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(Number(entry.value)) + " (workspace currency)")),
+              detailField(entry.title + " · " + enumText(entry.stage), entry.value, "money"))),
           ],
         };
         break;
@@ -413,12 +417,15 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
                 new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(Number(entry.unitPrice))),
               detailField("Line total", entry.lineTotal, "money"),
             ])),
-            detailSection("Recorded payments", row.payments.map((entry) =>
-              detailField([shortDate(entry.paidAt), enumText(entry.method), entry.reference, enumText(entry.status)].filter(Boolean).join(" · "),
-                entry.amount, "money")),
-            detailSection("Receipt allocations", row.receiptAllocations.map((entry) =>
+            detailSection("Recorded payments", row.payments.flatMap((entry) => [
+              detailField([enumText(entry.method), entry.reference, enumText(entry.status)].filter(Boolean).join(" · ") || "Payment", entry.amount, "money"),
+              detailField("Payment date · " + enumText(entry.method), entry.paidAt, "datetime"),
+            ])),
+            detailSection("Receipt allocations", row.receiptAllocations.flatMap((entry) => [
               detailField(entry.receipt.receiptNumber + " · " + [enumText(entry.receipt.method), enumText(entry.receipt.status)].filter(Boolean).join(" · "),
-                entry.amount, "money")),
+                entry.amount, "money"),
+              detailField("Received on · " + entry.receipt.receiptNumber, entry.receipt.receivedAt, "datetime"),
+            ])),
           ],
         };
         break;
@@ -436,7 +443,7 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
               detailField("Amount received", row.amount, "money"), detailField("Method", row.method, "status"),
               detailField("Transaction reference", row.reference), detailField("Payment date", row.paidAt, "datetime"),
               detailField("Status", row.status, "status"), detailField("Notes", row.notes),
-              detailField("Recorded", row.createdAt, "datetime),
+              detailField("Recorded", row.createdAt, "datetime"),
             ]),
             detailSection("Related invoice", [
               detailField("Invoice", row.invoice.invoiceNumber, "text", "/operations/invoices/" + encodeURIComponent(row.invoice.id)),
