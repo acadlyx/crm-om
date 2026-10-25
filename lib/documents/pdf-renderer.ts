@@ -101,9 +101,9 @@ export async function renderDocumentPdf(data: DocumentPDFData, template: Documen
   const italic = await pdf.embedFont(StandardFonts.HelveticaOblique);
   const logo = template.showLogo ? await embedLogo(pdf, data.business.logoUrl) : null;
 
-  let page: PDFPage;
-  let y: number;
-  let pageIndex = 0;
+  let page = pdf.addPage(size);
+  let y = height - margin;
+  let pageIndex = 1;
   const newPage = () => {
     page = pdf.addPage(size);
     pageIndex += 1;
@@ -199,7 +199,6 @@ export async function renderDocumentPdf(data: DocumentPDFData, template: Documen
     y -= 8;
   };
 
-  newPage();
   const blocks: DocumentBlockKey[] = template.blockOrder;
   for (const block of blocks) {
     if (template.hiddenBlocks.includes(block)) continue;
