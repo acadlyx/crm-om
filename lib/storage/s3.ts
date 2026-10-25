@@ -1,30 +1,16 @@
 import "server-only";
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { del, list, put } from "@vercel/blob";
 
-let client: S3Client | null = null;
-function configured() {
-  return Boolean(process.env.S3_BUCKET && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY && process.env.S3_PUBLIC_BASE_URL);
-}
-export function isObjectStorageConfigured() { return configured(); }
-
-function getClient() {
-  if (!configured()) throw new Error("Object storage is not configured.");
-  if (!client) {
-    client = new S3Client({
-      region: process.env.S3_REGION || "auto",
-      endpoint: process.env.S3_ENDPOINT || undefined,
-      forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true",
-      credentials: {
-        accessKeyId: process.env.S3_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
-      },
-    });
-  }
-  return client;
+/**
+ * Logo assets use the public Vercel Blob store connected to this project.
+ * Vercel injects BLOB_READ_WRITE_TOKEN for production, preview, and development.
+ */
+function getToken(): string | undefined {
+  return process.env.BLOB_READ_WRITE_TOKEN || undefined;
 }
 
-function encodeKey(key: string) {
-  return key.split("/").map(encodeURIComponent).join("/");
+export function isObjectStorageConfigured(): boolean {
+  return Boolean(getToken());
 }
 
 export async function uploadPublicAsset(input: {
@@ -33,16 +19,29 @@ export async function uploadPublicAsset(input: {
   contentType: string;
   cacheControl?: string;
 }): Promise<string> {
-  await getClient().send(new PutObjectCommand({
-    Bucket: process.env.S3_BUCKET!,
-    Key: input.key,
-    Body: input.bytes,
-    ContentType: input.contentType,
-    CacheControl: input.cacheControl ?? "public, max-age=31536000, immutable",
-  }));
-  return process.env.S3_PUBLIC_BASE_URL!.replace(/\/$/, "") + "/" + encodeKey(input.key);
+  const token = getToken();
+  if (!token) {
+    throw new Error("Vercel Blob is not configured: BLOB_READ_WRITE_TOKEN is missing.");
+  }
+
+  const result = await put(input.key, Buffer.from(input.bytes), {
+    access: "public",
+    addRandomSuffix: false,
+    contentType: input.contentType,
+    cacheControlMaxAge: 60 * 60 * 24 * 365,
+    token,
+  });
+  return result.url;
 }
 
 export async function deletePublicAsset(key: string): Promise<void> {
-  await getClient().send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET!, Key: key }));
+  const token = getToken();
+  if (!token) {
+    throw new Error("Vercel Blob is not configured: BLOB_READ_WRITE_TOKEN is missing.");
+  }
+
+  // Blob deletion takes a URL, so resolve the exact pathname first.
+  const result = await list({ prefix: key, limit: 1000, token });
+  const blob = result.blobs.find((item) => item.pathname === key);
+  if (blob) await del(blob.url, { token });
 }
