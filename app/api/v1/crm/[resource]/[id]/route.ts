@@ -382,7 +382,7 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
 
   const tenantId = access.tenantId;
   let detail: RecordDetail | null = null;
-  const enumText = (value: string | null | undefined) => value ? value.replaceAll("_", " ") : null;
+  const enumText = (value: string | null | undefined) => value ? value.replaceAll("_", " ").toLowerCase().replace(/\\b\\w/g, (letter) => letter.toUpperCase()) : null;
 
   try {
     switch (resource) {
