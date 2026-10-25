@@ -5,6 +5,7 @@ import { requireWorkspaceAccess } from "@/lib/crm/access";
 import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { isSameOriginRequest } from "@/lib/security/http";
 import { outstandingBalance } from "@/lib/operations/finance";
+import { isMissingUpiCollectionTable, UPI_SCHEMA_NOT_READY_MESSAGE } from "@/lib/operations/upi-schema-error";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,7 @@ export async function GET() {
       business: { name: settings?.businessName || "Business", currency: settings?.currency || "INR" },
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
+    if (isMissingUpiCollectionTable(error)) return jsonError(503, UPI_SCHEMA_NOT_READY_MESSAGE);
     console.error("UPI collections read failed.", error instanceof Error ? error.message : "unknown");
     return jsonError(500, "Could not load UPI collection history. Refresh and retry.");
   }
@@ -153,6 +155,7 @@ export async function POST(request: Request) {
       idempotentReplay: result.replay,
     }, { status: result.replay ? 200 : 201, headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
+    if (isMissingUpiCollectionTable(error)) return jsonError(503, UPI_SCHEMA_NOT_READY_MESSAGE);
     const message = error instanceof Error ? error.message : "";
     const responses: Record<string, [number, string]> = {
       IDEMPOTENCY_KEY_CONFLICT: [409, "That retry key was already used for different collection details. Refresh the form and retry."],

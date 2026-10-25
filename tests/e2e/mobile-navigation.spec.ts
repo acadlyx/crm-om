@@ -12,20 +12,23 @@ test("mobile workspace navigation opens, closes, and stays within the viewport",
   await page.getByRole("button", { name: /sign in/i }).click();
   await expect(page).toHaveURL(/\/dashboard(?:$|\?)/);
 
+  const sidebar = page.locator("#workspace-sidebar .sidebar");
   const openButton = page.getByRole("button", { name: "Open navigation menu" });
   await expect(openButton).toBeVisible();
-  await expect(page.locator("#app-sidebar")).not.toBeVisible();
+  await expect(sidebar).not.toBeVisible();
 
   await openButton.click();
-  const closeButton = page.getByRole("button", { name: "Close navigation menu" }).first();
-  await expect(closeButton).toBeVisible();
-  await expect(page.locator("#app-sidebar")).toBeVisible();
-  await expect(page.locator("#app-sidebar").getByRole("link", { name: "Overview" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Close navigation menu" })).toBeVisible();
+  await expect(sidebar).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: "Overview" })).toBeVisible();
 
   await page.keyboard.press("Escape");
-  await expect(page.locator("#app-sidebar")).not.toBeVisible();
+  await expect(sidebar).not.toBeVisible();
   await expect(page.getByRole("button", { name: "Open navigation menu" })).toHaveAttribute("aria-expanded", "false");
 
   const dimensions = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
-    document: do¶»§q«^
+    document: document.documentElement.scrollWidth,
+  }));
+  expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
+});

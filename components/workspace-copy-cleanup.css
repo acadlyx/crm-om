@@ -1,0 +1,6 @@
+/* Keep authenticated workspaces task-focused. Critical field validation and financial safeguards remain visible. */
+.workspace-shell .dashboard-subtitle,
+.workspace-shell .main-content > p.muted,
+.workspace-shell .dashboard-empty > p {
+  display: none !important;
+}

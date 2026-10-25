@@ -4,6 +4,7 @@ import { requireWorkspaceAccess } from "@/lib/crm/access";
 import { requireWorkspacePermission } from "@/lib/operations/permissions";
 import { isSameOriginRequest } from "@/lib/security/http";
 import { reconcileUpiCollection } from "@/lib/operations/upi-collections";
+import { isMissingUpiCollectionTable, UPI_SCHEMA_NOT_READY_MESSAGE } from "@/lib/operations/upi-schema-error";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       case "OVERPAYMENT": return jsonError(409, "This payment exceeds the current outstanding invoice balance. Refresh the invoice before reconciling.");
     }
   } catch (error) {
+    if (isMissingUpiCollectionTable(error)) return jsonError(503, UPI_SCHEMA_NOT_READY_MESSAGE);
     if ((error as { code?: string })?.code === "P2002") return jsonError(409, "That UTR or payment key already exists. Refresh payment history before retrying.");
     if ((error as { code?: string })?.code === "P2034") return jsonError(409, "Another transaction changed this invoice at the same time. Retry the reconciliation.");
     console.error("UPI reconciliation failed.", (error as { code?: string })?.code || "UNKNOWN");
@@ -91,6 +93,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     if (result === "IMMUTABLE") return jsonError(409, "Paid, expired or failed UPI history is retained for audit. Do not delete a financial record.");
     return Response.json({ data: { id, deleted: true } }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
+    if (isMissingUpiCollectionTable(error)) return jsonError(503, UPI_SCHEMA_NOT_READY_MESSAGE);
     console.error("UPI collection delete failed.", (error as { code?: string })?.code || "UNKNOWN");
     return jsonError(500, "Could not delete this pending collection. Refresh and retry.");
   }
