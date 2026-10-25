@@ -22,6 +22,7 @@ export type DocumentTemplate = {
   paperSize: "A4" | "LETTER";
   orientation: "portrait" | "landscape";
   headerStyle: "band" | "rule" | "plain";
+  fontFamily: "Helvetica" | "TimesRoman" | "Courier";
   fontSize: number;
   titleSize: number;
   logoSize: number;
@@ -42,7 +43,7 @@ const BLOCK_KEYS = DOCUMENT_BLOCKS.map((block) => block.key) as DocumentBlockKey
 const DEFAULTS: Record<DocumentKind, Omit<DocumentTemplate, "blockOrder" | "hiddenBlocks"> & { blockOrder: DocumentBlockKey[]; hiddenBlocks: DocumentBlockKey[] }> = {
   invoice: {
     title: "Tax Invoice", accentColor: "#176B4D", paperSize: "A4", orientation: "portrait",
-    headerStyle: "band", fontSize: 9, titleSize: 25, logoSize: 64, logoPosition: "left",
+    headerStyle: "band", fontFamily: "Helvetica", fontSize: 9, titleSize: 25, logoSize: 64, logoPosition: "left",
     showLogo: true, showStatus: true,
     blockOrder: ["business", "title", "party", "metadata", "items", "totals", "history", "notes", "custom", "signature", "footer"],
     hiddenBlocks: ["custom"], signatureLabel: "Authorised signature",
@@ -50,7 +51,7 @@ const DEFAULTS: Record<DocumentKind, Omit<DocumentTemplate, "blockOrder" | "hidd
   },
   customerReceipt: {
     title: "Payment Receipt", accentColor: "#176B4D", paperSize: "A4", orientation: "portrait",
-    headerStyle: "rule", fontSize: 9, titleSize: 24, logoSize: 58, logoPosition: "left",
+    headerStyle: "rule", fontFamily: "TimesRoman", fontSize: 9, titleSize: 24, logoSize: 58, logoPosition: "left",
     showLogo: true, showStatus: true,
     blockOrder: ["business", "title", "party", "metadata", "totals", "items", "history", "notes", "custom", "signature", "footer"],
     hiddenBlocks: ["custom"], signatureLabel: "Received / authorised by",
@@ -58,7 +59,7 @@ const DEFAULTS: Record<DocumentKind, Omit<DocumentTemplate, "blockOrder" | "hidd
   },
   supplierBill: {
     title: "Supplier Bill", accentColor: "#315FC9", paperSize: "A4", orientation: "portrait",
-    headerStyle: "band", fontSize: 9, titleSize: 24, logoSize: 64, logoPosition: "left",
+    headerStyle: "band", fontFamily: "Helvetica", fontSize: 9, titleSize: 24, logoSize: 64, logoPosition: "left",
     showLogo: true, showStatus: true,
     blockOrder: ["business", "title", "party", "metadata", "items", "totals", "history", "notes", "custom", "signature", "footer"],
     hiddenBlocks: ["custom", "signature"], signatureLabel: "Authorised signature",
@@ -66,7 +67,7 @@ const DEFAULTS: Record<DocumentKind, Omit<DocumentTemplate, "blockOrder" | "hidd
   },
   supplierPayment: {
     title: "Supplier Payment Voucher", accentColor: "#315FC9", paperSize: "A4", orientation: "portrait",
-    headerStyle: "rule", fontSize: 9, titleSize: 24, logoSize: 58, logoPosition: "left",
+    headerStyle: "rule", fontFamily: "TimesRoman", fontSize: 9, titleSize: 24, logoSize: 58, logoPosition: "left",
     showLogo: true, showStatus: true,
     blockOrder: ["business", "title", "party", "metadata", "totals", "items", "history", "notes", "custom", "signature", "footer"],
     hiddenBlocks: ["custom"], signatureLabel: "Authorised by",
@@ -110,13 +111,14 @@ export function normalizeDocumentTemplate(kind: DocumentKind, value: unknown): D
   const headerStyle = input.headerStyle === "rule" || input.headerStyle === "plain" ? input.headerStyle : "band";
   const logoPosition = input.logoPosition === "center" || input.logoPosition === "right" ? input.logoPosition : "left";
   const paperSize = input.paperSize === "LETTER" ? "LETTER" : "A4";
+  const fontFamily = input.fontFamily === "TimesRoman" || input.fontFamily === "Courier" ? input.fontFamily : "Helvetica";
   const accentColor = typeof input.accentColor === "string" && /^#[0-9a-fA-F]{6}$/.test(input.accentColor)
     ? input.accentColor.toUpperCase() : fallback.accentColor;
   const blockOrder = safeBlocks(input.blockOrder, fallback.blockOrder);
   const hiddenBlocks = safeBlocks(input.hiddenBlocks, fallback.hiddenBlocks, true);
   return {
     title: safeText(input.title, fallback.title, 80) || fallback.title,
-    accentColor, paperSize, orientation, headerStyle,
+    accentColor, paperSize, orientation, headerStyle, fontFamily,
     fontSize: safeInteger(input.fontSize, fallback.fontSize, 7, 13),
     titleSize: safeInteger(input.titleSize, fallback.titleSize, 16, 34),
     logoSize: safeInteger(input.logoSize, fallback.logoSize, 28, 104),
