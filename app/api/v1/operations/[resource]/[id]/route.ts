@@ -982,7 +982,7 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
               detailField((index + 1) + ". " + entry.product.name + " · " + entry.product.sku,
                 Number(entry.quantity) + " " + entry.product.unit + " · unit cost " +
                 new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(Number(entry.unitCost))),
-              detailField("Received value", entry.lineTotal, "money"),
+              detailField("Received value", Number(entry.quantity) * Number(entry.unitCost), "money"),
             ])),
           ],
         };
