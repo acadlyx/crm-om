@@ -130,6 +130,25 @@ a { color:inherit; text-decoration:none; }
 .sidebar-link svg { flex:0 0 auto; color:#7d899c; }
 .sidebar-link:hover { background:#f2f5fa; color:#1e3a68; }
 .sidebar-link:hover svg { color:#315fc9; }
+.sidebar-link[aria-current="page"] {
+  position:relative;
+  background:#edf4ff;
+  color:#214da7;
+  font-weight:750;
+  box-shadow:inset 3px 0 #315fc9;
+}
+.sidebar-link[aria-current="page"] svg { color:#315fc9; }
+.sidebar-link[aria-current="page"]::after {
+  content:"";
+  width:6px;
+  height:6px;
+  flex:0 0 6px;
+  margin-left:auto;
+  border-radius:50%;
+  background:#315fc9;
+  box-shadow:0 0 0 3px #dbe7ff;
+}
+.sidebar-link[aria-current="page"]:hover { background:#e7efff; color:#183f96; }
 .workspace-admin-page,.crm-module-page { display:grid; gap:20px; max-width:1600px; margin:0 auto; }
 .workspace-admin-card,.workspace-list-card { padding:24px; }
 .workspace-form-title { display:flex; align-items:center; gap:13px; margin-bottom:23px; }
