@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState, type FormEvent } from "react";
-import { RecordDetailDrawer } from "@/components/record-detail-drawer";
+import { useMemo, useState, type FormEvent } from "react";
+import { RecordDetailsAction } from "@/components/record-details-action";
 import { useRouter } from "next/navigation";
 import {
   ArrowDownToLine, ArrowRight, ArrowUpRight, CheckCircle2, CircleAlert, Eye, LoaderCircle,
@@ -89,8 +89,6 @@ export function CrmModule({
   const [notice, setNotice] = useState("");
   const [financialIdempotencyKey, setFinancialIdempotencyKey] = useState<{ signature: string; key: string } | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<CrmRow | null>(null);
-  const [detailId, setDetailId] = useState<string | null>(null);
-  const closeDetails = useCallback(() => setDetailId(null), []);
   const tableColumns = useMemo(() => {
     const keys = CRM_SUMMARY_COLUMN_KEYS[resource];
     return keys ? columns.filter((column) => keys.includes(column.key)) : columns;
@@ -379,7 +377,7 @@ export function CrmModule({
                   {workflow.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>{busyRow === row.id && <LoaderCircle size={13} className="workspace-spinner crm-inline-spinner" />}</td>}
                 <td><div className="operations-row-actions">
-                  {resource !== "invoices" && <button type="button" className="crm-secondary-button" aria-label={"View details for " + String(row[tableColumns[0]?.key] || recordLabel || "record")} onClick={() => setDetailId(row.id)}><Eye size={14} aria-hidden="true" />View</button>}
+                  {resource !== "invoices" && <RecordDetailsAction endpoint={"/api/v1/crm/" + encodeURIComponent(resource) + "/" + encodeURIComponent(row.id)} recordLabel={String(row[tableColumns[0]?.key] || recordLabel || "record")} />}
                   
                   {resource === "invoices" && <><a className="crm-secondary-button" href={"/operations/invoices/" + encodeURIComponent(row.id)}><Eye size={14} />View invoice</a><a className="crm-secondary-button" href={"/api/v1/operations/invoices/" + encodeURIComponent(row.id) + "/pdf"} download><ArrowDownToLine size={14} />Download PDF</a></>}
                   {resource === "customers" && canUpdate && <button type="button" className="crm-secondary-button" onClick={() => { setError(""); setNotice(""); setEditingCustomer(row); }}>Edit profile</button>}
@@ -406,7 +404,6 @@ export function CrmModule({
         </div>}
         <p className="crm-table-footnote"><ArrowUpRight size={13} />Records are isolated to your business workspace. No other company&apos;s data is shown.</p>
       </section>
-      {detailId && <RecordDetailDrawer source="crm" resource={resource} id={detailId} onClose={closeDetails} />}
     </div>
   );
 }
