@@ -21,5 +21,5 @@ export default async function BusinessSettingsPage() {
     inventoryCostingMethod: settings.inventoryCostingMethod as "WEIGHTED_AVERAGE",
     defaultPaymentTermsDays: settings.defaultPaymentTermsDays,
   }:null;
-  return <><p className="muted">Tenant settings</p><h1 style={{fontSize:30,marginTop:4}}>Business identity</h1><p className="muted">Manage your business identity, invoice settings, and branded customer receipt PDF template. These settings never change the global product brand.</p><section className="card"><TenantSettingsForm initial={initial}/></section></>;
+  return <><p className="muted">Tenant settings</p><h1 style={{fontSize:30,marginTop:4}}>Business identity</h1><p className="muted">Manage your business identity, contact details, invoice numbering and operating preferences. Configure all branded PDFs separately in Document templates.</p><section className="card"><TenantSettingsForm initial={initial}/></section></>;
 }
