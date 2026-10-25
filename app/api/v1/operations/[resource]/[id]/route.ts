@@ -1019,6 +1019,25 @@ export async function GET(_request: Request, context: { params: Promise<{ resour
         };
         break;
       }
+      case "permissions": {
+        const row = await db.rolePermission.findFirst({ where: { id, tenantId } });
+        if (row) detail = {
+          type: "Access permission",
+          title: enumText(row.role) + " · " + enumText(row.moduleKey),
+          reference: enumText(row.actionKey),
+          status: row.granted ? "GRANTED" : "DENIED",
+          sections: [
+            detailSection("Permission rule", [
+              detailField("Role", row.role, "status"),
+              detailField("Workspace module", enumText(row.moduleKey)),
+              detailField("Allowed action", enumText(row.actionKey)),
+              detailField("Access decision", row.granted ? "Granted" : "Denied", "status"),
+              detailField("Last updated", row.updatedAt, "datetime"),
+            ]),
+          ],
+        };
+        break;
+      }
       case "ledger": {
         const row = await db.ledgerEntry.findFirst({
           where: { id, tenantId },
