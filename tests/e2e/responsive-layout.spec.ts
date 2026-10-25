@@ -13,17 +13,14 @@ test("representative CRM screens do not create page-level horizontal overflow", 
   await page.getByRole("button", { name: /sign in/i }).click();
   await expect(page).toHaveURL(/\/dashboard(?:$|\?)/);
 
-  // Exercise every requested width on the shared shell and two main table layouts.
   const allWidthRoutes = ["/dashboard", "/crm/customers", "/operations/products"];
-  // Additional business screens are checked at narrow phone, tablet and wide desktop widths.
   const representativeRoutes = ["/crm/invoices", "/operations/sales-orders", "/settings/business"];
 
   for (const route of allWidthRoutes) {
     for (const width of widths) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(route);
-      await expect(page).toHaveURL(new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, "\\      await page.goto(route);
-      const dimensions = await page.evaluate(() => ({") + "(?:$|[?#])"));
+      await expect(page).toHaveURL(new URL(route, page.url()));
       await expect(page.locator(".workspace-shell")).toBeVisible();
       const dimensions = await page.evaluate(() => ({
         viewport: document.documentElement.clientWidth,
@@ -31,7 +28,7 @@ test("representative CRM screens do not create page-level horizontal overflow", 
       }));
       expect(
         dimensions.document,
-        `${route} causes horizontal page overflow at ${width}px (${dimensions.document}px content in a ${dimensions.viewport}px viewport)`,
+        \`\${route} causes horizontal page overflow at \${width}px (\${dimensions.document}px content in a \${dimensions.viewport}px viewport)\`,
       ).toBeLessThanOrEqual(dimensions.viewport);
     }
   }
@@ -40,13 +37,15 @@ test("representative CRM screens do not create page-level horizontal overflow", 
     for (const width of [320, 390, 768, 1440]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(route);
+      await expect(page).toHaveURL(new URL(route, page.url()));
+      await expect(page.locator(".workspace-shell")).toBeVisible();
       const dimensions = await page.evaluate(() => ({
         viewport: document.documentElement.clientWidth,
         document: document.documentElement.scrollWidth,
       }));
       expect(
         dimensions.document,
-        `${route} causes horizontal page overflow at ${width}px (${dimensions.document}px content in a ${dimensions.viewport}px viewport)`,
+        \`\${route} causes horizontal page overflow at \${width}px (\${dimensions.document}px content in a \${dimensions.viewport}px viewport)\`,
       ).toBeLessThanOrEqual(dimensions.viewport);
     }
   }
