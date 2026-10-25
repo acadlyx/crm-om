@@ -20,7 +20,10 @@ test("mobile workspace navigation opens, closes, and stays within the viewport",
   await openButton.click();
   await expect(page.getByRole("button", { name: "Close navigation menu" })).toBeVisible();
   await expect(sidebar).toBeVisible();
-  await expect(sidebar.getByRole("link", { name: "Overview" })).toBeVisible();
+  const overviewLink = sidebar.getByRole("link", { name: "Overview" });
+  await expect(overviewLink).toBeVisible();
+  await expect(overviewLink).toHaveAttribute("aria-current", "page");
+  await expect(sidebar.locator('.sidebar-link[aria-current="page"]')).toHaveCount(1);
 
   await page.keyboard.press("Escape");
   await expect(sidebar).not.toBeVisible();
