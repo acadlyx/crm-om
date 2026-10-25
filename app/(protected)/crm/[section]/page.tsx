@@ -244,7 +244,7 @@ export default async function CrmSectionPage({ params }: { params: Promise<{ sec
         { key: "issueDate", label: "Issue date" }, { key: "dueDate", label: "Due date" }, { key: "subtotal", label: "Subtotal" },
         { key: "discountAmount", label: "Discount" }, { key: "taxAmount", label: "Tax" }, { key: "total", label: "Total" },
         { key: "paidAmount", label: "Paid" }, { key: "balance", label: "Remaining" }, { key: "status", label: "Status" },
-        { key: "salesOrderId", label: "Sales order ID" }, { key: "notes", label: "Notes" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
+        { key: "notes", label: "Notes" }, { key: "createdAt", label: "Created" }, { key: "updatedAt", label: "Updated" },
       ];
       break;
     }
