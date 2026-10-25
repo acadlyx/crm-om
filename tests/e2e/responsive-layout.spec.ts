@@ -28,7 +28,7 @@ test("representative CRM screens do not create page-level horizontal overflow", 
       }));
       expect(
         dimensions.document,
-        \`\${route} causes horizontal page overflow at \${width}px (\${dimensions.document}px content in a \${dimensions.viewport}px viewport)\`,
+        `${route} causes horizontal page overflow at ${width}px (${dimensions.document}px content in a ${dimensions.viewport}px viewport)`,
       ).toBeLessThanOrEqual(dimensions.viewport);
     }
   }
@@ -45,7 +45,7 @@ test("representative CRM screens do not create page-level horizontal overflow", 
       }));
       expect(
         dimensions.document,
-        \`\${route} causes horizontal page overflow at \${width}px (\${dimensions.document}px content in a \${dimensions.viewport}px viewport)\`,
+        `${route} causes horizontal page overflow at ${width}px (${dimensions.document}px content in a ${dimensions.viewport}px viewport)`,
       ).toBeLessThanOrEqual(dimensions.viewport);
     }
   }
