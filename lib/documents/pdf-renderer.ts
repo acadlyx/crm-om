@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
+import sharp from "sharp";
 import type { DocumentBlockKey, DocumentTemplate, DocumentKind } from "@/lib/documents/templates";
 
 type Item = { description: string; quantity?: string; unitPrice?: string; discount?: string; tax?: string; total?: string; detail?: string };
@@ -72,10 +73,14 @@ async function embedLogo(pdf: PDFDocument, url?: string | null): Promise<PDFImag
     if (!response.ok) return null;
     const type = (response.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
     const length = Number(response.headers.get("content-length") || 0);
-    if (!["image/png", "image/jpeg"].includes(type) || length > 1_500_000) return null;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(type) || length > 2_000_000) return null;
     const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.byteLength > 1_500_000) return null;
-    return type === "image/png" ? await pdf.embedPng(bytes) : await pdf.embedJpg(bytes);
+    if (bytes.byteLength > 2_000_000) return null;
+    if (type === "image/png") return await pdf.embedPng(bytes);
+    if (type === "image/jpeg") return await pdf.embedJpg(bytes);
+    const png = await sharp(bytes, { limitInputPixels: 40_000_000 }).png({ compressionLevel: 9, palette: true }).toBuffer();
+    if (png.byteLength > 1_500_000) return null;
+    return await pdf.embedPng(png);
   } catch {
     return null;
   }
