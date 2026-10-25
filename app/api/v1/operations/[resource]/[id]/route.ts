@@ -17,6 +17,134 @@ async function audit(tx: Prisma.TransactionClient, actorUserId: string, action: 
   });
 }
 
+function serializeOperationDetail(value: unknown): unknown {
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(serializeOperationDetail);
+  if (value && typeof value === "object") {
+    const candidate = value as { toNumber?: () => number; toFixed?: (digits?: number) => string };
+    if (typeof candidate.toNumber === "function" && typeof candidate.toFixed === "function") return candidate.toNumber();
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !["id", "tenantId", "tenant", "idempotencyKey", "passwordHash", "referenceId"].includes(key) && !key.endsWith("Id"))
+      .map(([key, nested]) => [key, serializeOperationDetail(nested)]));
+  }
+  return value;
+}
+
+async function operationRecordForDetail(resource: string, id: string, tenantId: string): Promise<unknown | null> {
+  switch (resource) {
+    case "products":
+      return db.product.findFirst({ where: { id, tenantId } });
+    case "suppliers":
+      return db.supplier.findFirst({
+        where: { id, tenantId },
+        include: {
+          purchaseOrders: { where: { tenantId }, orderBy: { orderDate: "desc" }, take: 10, select: { orderNumber: true, orderDate: true, total: true, status: true } },
+          bills: { where: { tenantId }, orderBy: { issueDate: "desc" }, take: 10, select: { billNumber: true, dueDate: true, total: true, status: true } },
+        },
+      });
+    case "sales-orders":
+      return db.salesOrder.findFirst({
+        where: { id, tenantId },
+        include: {
+          customer: { select: { name: true, company: true, email: true, phone: true } },
+          items: { orderBy: { createdAt: "asc" }, include: { product: { select: { name: true, sku: true, unit: true } } } },
+          deliveries: { where: { tenantId }, orderBy: { createdAt: "desc" }, take: 10, select: { deliveryNumber: true, status: true, scheduledAt: true, completedAt: true } },
+          invoices: { where: { tenantId }, orderBy: { createdAt: "desc" }, take: 10, select: { invoiceNumber: true, status: true, total: true, dueDate: true } },
+        },
+      });
+    case "purchase-orders":
+      return db.purchaseOrder.findFirst({
+        where: { id, tenantId },
+        include: {
+          supplier: { select: { name: true, company: true, email: true, phone: true } },
+          items: { orderBy: { createdAt: "asc" }, include: { product: { select: { name: true, sku: true, unit: true } } } },
+          receipts: { where: { tenantId }, orderBy: { receivedAt: "desc" }, take: 10, select: { receiptNumber: true, status: true, receivedAt: true } },
+          bills: { where: { tenantId }, orderBy: { issueDate: "desc" }, take: 10, select: { billNumber: true, status: true, total: true, dueDate: true } },
+        },
+      });
+    case "goods-receipts":
+      return db.goodsReceipt.findFirst({
+        where: { id, tenantId },
+        include: {
+          purchaseOrder: { select: { orderNumber: true, supplier: { select: { name: true, company: true } } } },
+          items: { include: { product: { select: { name: true, sku: true, unit: true } } } },
+        },
+      });
+    case "deliveries":
+      return db.delivery.findFirst({
+        where: { id, tenantId },
+        include: {
+          order: { select: { orderNumber: true, status: true, customer: { select: { name: true, company: true } } } },
+          assignedUser: { select: { name: true } },
+          items: { include: { product: { select: { name: true, sku: true, unit: true } } } },
+        },
+      });
+    case "customer-receipts":
+      return db.customerReceipt.findFirst({
+        where: { id, tenantId },
+        include: {
+          customer: { select: { name: true, company: true, email: true, phone: true, addresses: true } },
+          allocations: { where: { invoice: { tenantId } }, include: { invoice: { select: { invoiceNumber: true, status: true, total: true, dueDate: true } } } },
+        },
+      });
+    case "supplier-bills":
+      return db.supplierBill.findFirst({
+        where: { id, tenantId },
+        include: {
+          supplier: { select: { name: true, company: true, email: true, phone: true, address: true, taxId: true } },
+          purchaseOrder: { select: { orderNumber: true, items: { include: { product: { select: { name: true, sku: true, unit: true } } } } } },
+          allocations: { where: { payment: { tenantId } }, include: { payment: { select: { amount: true, method: true, reference: true, paidAt: true, status: true } } } },
+        },
+      });
+    case "supplier-payments":
+      return db.supplierPayment.findFirst({
+        where: { id, tenantId },
+        include: {
+          supplier: { select: { name: true, company: true, email: true, phone: true, address: true, taxId: true } },
+          allocations: { where: { bill: { tenantId } }, include: { bill: { select: { billNumber: true, dueDate: true, status: true, total: true } } } },
+        },
+      });
+    case "inventory":
+      return db.inventoryMovement.findFirst({
+        where: { id, tenantId }, include: { product: { select: { name: true, sku: true, unit: true, stockOnHand: true } } },
+      });
+    case "customer-follow-ups":
+      return db.customerFollowUp.findFirst({
+        where: { id, tenantId },
+        include: { customer: { select: { name: true, company: true, email: true, phone: true } }, assignedUser: { select: { name: true } } },
+      });
+    case "ledger":
+      return db.ledgerEntry.findFirst({
+        where: { id, tenantId },
+        include: { customer: { select: { name: true, company: true } }, supplier: { select: { name: true, company: true } } },
+      });
+    case "permissions":
+      return db.rolePermission.findFirst({ where: { id, tenantId } });
+    default:
+      return null;
+  }
+}
+
+export async function GET(_request: Request, context: { params: Promise<{ resource: string; id: string }> }) {
+  const access = await requireWorkspaceAccess();
+  if (!access.ok) return fail(access.message, access.status);
+  const { resource, id } = await context.params;
+  const permission = await requireWorkspacePermission(access, resource, "read");
+  if (!permission.ok) return fail(permission.message, permission.status);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    return fail("Invalid record identifier.", 400);
+  }
+  try {
+    const record = await operationRecordForDetail(resource, id, access.tenantId);
+    if (!record) return fail("Record not found in this workspace.", 404);
+    return Response.json({ data: serializeOperationDetail(record) }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    console.error("Operations detail load failed:", resource, code || "UNKNOWN");
+    return fail("Could not load this record's details.", 500);
+  }
+}
+
 export async function PATCH(request: Request, context: { params: Promise<{ resource: string; id: string }> }) {
   const access = await requireWorkspaceAccess();
   if (!access.ok) return fail(access.message, access.status);
