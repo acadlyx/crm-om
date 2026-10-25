@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
-import { RecordDetailsAction } from "@/components/record-details-action";
+import { useCallback, useMemo, useState, type FormEvent } from "react";
+import { RecordDetailDrawer } from "@/components/record-detail-drawer";
 import { useRouter } from "next/navigation";
 import {
   ArrowDownToLine, ArrowRight, ArrowUpRight, CheckCircle2, CircleAlert, Eye, LoaderCircle,
@@ -23,6 +23,18 @@ export type CrmColumn = { key: string; label: string };
 type CrmRow = Record<string, unknown> & { id: string };
 
 type Workflow = { field: "status" | "stage"; label: string; options: { label: string; value: string }[] };
+
+const CRM_SUMMARY_COLUMN_KEYS: Record<string, string[]> = {
+  customers: ["name", "company", "email", "phone", "status"],
+  leads: ["fullName", "company", "source", "estimatedValue", "status"],
+  deals: ["title", "contact", "company", "value", "expectedCloseDate", "stage"],
+  invoices: ["invoiceNumber", "customerName", "issueDate", "dueDate", "total", "paidAmount", "balance", "status"],
+  payments: ["invoiceNumber", "customerName", "amount", "method", "reference", "paidAt", "status"],
+  expenses: ["title", "category", "vendor", "amount", "spentAt", "status"],
+  tasks: ["title", "customerName", "dueDate", "priority", "status"],
+};
+
+
 
 function humanize(value: string) {
   return value.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -77,6 +89,12 @@ export function CrmModule({
   const [notice, setNotice] = useState("");
   const [financialIdempotencyKey, setFinancialIdempotencyKey] = useState<{ signature: string; key: string } | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<CrmRow | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const closeDetails = useCallback(() => setDetailId(null), []);
+  const tableColumns = useMemo(() => {
+    const keys = CRM_SUMMARY_COLUMN_KEYS[resource];
+    return keys ? columns.filter((column) => keys.includes(column.key)) : columns;
+  }, [columns, resource]);
 
   const filteredRows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -349,19 +367,19 @@ export function CrmModule({
         </div>
         {filteredRows.length ? (
           <div className="crm-table-wrap"><table className="crm-table">
-            <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}{workflow && canUpdate && <th>{workflow.label}</th>}<th>Actions</th></tr></thead>
+            <thead><tr>{tableColumns.map((column) => <th key={column.key}>{column.label}</th>)}{workflow && canUpdate && <th>{workflow.label}</th>}<th>Actions</th></tr></thead>
             <tbody>{filteredRows.slice(0, visibleCount).map((row) => (
               <tr key={row.id}>
-                {columns.map((column, index) => {
+                {tableColumns.map((column, index) => {
                   const value = row[column.key];
                   const statusish = ["status", "stage", "priority"].includes(column.key);
-                  return <td key={column.key}>{index === 0 ? <strong className="crm-primary-cell">{display(value, column.key)}</strong> : statusish ? <span className={"crm-pill crm-pill-" + String(value || "").toLowerCase()}>{display(value, column.key)}</span> : display(value, column.key)}</td>;
+                  return <td key={column.key} data-column={column.key}>{index === 0 ? <strong className="crm-primary-cell">{display(value, column.key)}</strong> : statusish ? <span className={"crm-pill crm-pill-" + String(value || "").toLowerCase()}>{display(value, column.key)}</span> : display(value, column.key)}</td>;
                 })}
                 {workflow && canUpdate && <td><select className="crm-workflow-select" value={String(row[workflow.field] || "")} disabled={busyRow === row.id} onChange={(event) => updateWorkflow(row, event.target.value)} aria-label={workflow.label + " for " + String(row[columns[0]?.key] || "record")}>
                   {workflow.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>{busyRow === row.id && <LoaderCircle size={13} className="workspace-spinner crm-inline-spinner" />}</td>}
                 <td><div className="operations-row-actions">
-                  {resource !== "invoices" && <RecordDetailsAction endpoint={"/api/v1/crm/" + encodeURIComponent(resource) + "/" + encodeURIComponent(row.id)} recordLabel={String(row[columns[0]?.key] || title)} />}
+                  {resource !== "invoices" && <button type="button" className="crm-secondary-button" aria-label={"View details for " + String(row[tableColumns[0]?.key] || recordLabel || "record")} onClick={() => setDetailId(row.id)}><Eye size={14} aria-hidden="true" />View</button>}
                   
                   {resource === "invoices" && <><a className="crm-secondary-button" href={"/operations/invoices/" + encodeURIComponent(row.id)}><Eye size={14} />View invoice</a><a className="crm-secondary-button" href={"/api/v1/operations/invoices/" + encodeURIComponent(row.id) + "/pdf"} download><ArrowDownToLine size={14} />Download PDF</a></>}
                   {resource === "customers" && canUpdate && <button type="button" className="crm-secondary-button" onClick={() => { setError(""); setNotice(""); setEditingCustomer(row); }}>Edit profile</button>}
@@ -388,6 +406,7 @@ export function CrmModule({
         </div>}
         <p className="crm-table-footnote"><ArrowUpRight size={13} />Records are isolated to your business workspace. No other company&apos;s data is shown.</p>
       </section>
+      {detailId && <RecordDetailDrawer source="crm" resource={resource} id={detailId} onClose={closeDetails} />}
     </div>
   );
 }
