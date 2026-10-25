@@ -191,7 +191,7 @@ export function DocumentTemplatesBuilder({
                 const isVisible = !template.hiddenBlocks.includes(key);
                 return (
                   <div key={key} className={"document-block-row" + (dragging === key ? " is-dragging" : "") + (!isVisible ? " is-hidden" : "")}
-                    draggable onDragStart={() => setDragging(key)} onDragEnd={() => setDragging(null)}
+                    draggable onDragStart={(event) => { event.dataTransfer.setData("text/plain", key); setDragging(key); }} onDragEnd={() => setDragging(null)}
                     onDragOver={(event) => event.preventDefault()} onDrop={(event) => handleDrop(event, key)}>
                     <GripVertical size={17} className="document-drag-grip" aria-hidden="true" />
                     <div className="document-block-name"><strong>{block.label}</strong><small>{block.description}</small></div>
