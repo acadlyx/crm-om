@@ -29,7 +29,7 @@ async function openWorkspaceRoute(page: Page, route: string) {
 test("representative CRM screens do not create page-level horizontal overflow", async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/login");
+  await page.goto("/logintoprivatecrmbysyzent7456");
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/password/i).fill(password);
   await page.getByRole("button", { name: /sign in/i }).click();
