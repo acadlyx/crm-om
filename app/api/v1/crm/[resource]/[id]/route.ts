@@ -282,7 +282,8 @@ export async function DELETE(request: Request, context: { params: Promise<{ reso
     const code = (error as { code?: string })?.code;
     if (code === "P2003" || code === "P2014") return fail(409, "This record is linked to existing business history and cannot be deleted.");
     if (code === "P2034") return fail(409, "Another transaction changed this record. Refresh the list and retry.");
-    console.error("CRM delete failed.", resource, code || "UNKNOWN");
+    const diagnostic = error instanceof Error ? error.message : String(error);
+    console.error("CRM delete failed.", resource, code || "UNKNOWN", diagnostic.slice(0, 500));
     return fail(500, "Could not delete the record. No intentional data change was made; refresh and retry.");
   }
 }
