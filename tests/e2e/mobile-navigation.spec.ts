@@ -8,7 +8,7 @@ test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true
 test("mobile workspace navigation opens, closes, and stays within the viewport", async ({ page }) => {
   await page.goto("/logintoprivatecrmbysyzent7456");
   await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).fill(password);
+  await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: /sign in/i }).click();
   await expect(page).toHaveURL(/\/dashboard(?:$|\?)/);
 
