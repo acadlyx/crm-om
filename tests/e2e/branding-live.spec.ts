@@ -10,7 +10,7 @@ test("branding update persists and appears on a fresh request without restarting
   expect(initialResponse.ok()).toBeTruthy();
   const initial = (await initialResponse.json()).data;
 
-  await page.goto("/login");
+  await page.goto("/logintoprivatecrmbysyzent7456");
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/password/i).fill(password);
   await page.getByRole("button", { name: /sign in/i }).click();
