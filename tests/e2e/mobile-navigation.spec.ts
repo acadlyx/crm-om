@@ -6,7 +6,7 @@ const password = process.env.PLATFORM_ADMIN_PASSWORD || "ci-only-password-long-e
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
 test("mobile workspace navigation opens, closes, and stays within the viewport", async ({ page }) => {
-  await page.goto("/login");
+  await page.goto("/logintoprivatecrmbysyzent7456");
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/password/i).fill(password);
   await page.getByRole("button", { name: /sign in/i }).click();
