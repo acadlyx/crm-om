@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-const email = process.env.PLATFORM_ADMIN_EMAIL || "admin@example.test";
-const password = process.env.PLATFORM_ADMIN_PASSWORD || "ci-only-password-long-enough";
+const email = process.env.E2E_TENANT_ADMIN_EMAIL || "e2e-owner@example.test";
+const password = process.env.E2E_TENANT_ADMIN_PASSWORD || "ci-e2e-owner-password-long-enough";
 
 test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
@@ -18,7 +18,7 @@ test("mobile workspace navigation opens, closes, and stays within the viewport",
   await expect(sidebar).not.toBeVisible();
 
   await openButton.click();
-  await expect(page.getByRole("button", { name: "Close navigation menu" })).toBeVisible();
+  await expect(page.locator('.mobile-shell-toggle[aria-label="Close navigation menu"]')).toBeVisible();
   await expect(sidebar).toBeVisible();
   const overviewLink = sidebar.getByRole("link", { name: "Overview" });
   await expect(overviewLink).toBeVisible();
