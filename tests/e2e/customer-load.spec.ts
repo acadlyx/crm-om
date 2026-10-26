@@ -39,7 +39,7 @@ function summarize(phase: string, elapsedMs: number, samples: Sample[]) {
   };
 }
 
-test("CRM customer API survives 1,000 simultaneous synthetic customer operations", async ({ page, baseURL }, testInfo) => {
+test("CRM customer API survives 1,000 simultaneous synthetic customer operations", async ({ page, baseURL }) => {
   test.setTimeout(600_000);
   const count = Number(process.env.LOAD_TEST_COUNT || "1000");
   expect(Number.isInteger(count) && count >= 1 && count <= 1000).toBeTruthy();
@@ -81,20 +81,26 @@ test("CRM customer API survives 1,000 simultaneous synthetic customer operations
         data: body,
         timeout: 120_000,
       });
-      const payload: any = await response.json().catch(() => null);
-      const id = typeof payload?.data?.id === "string" ? payload.data.id : undefined;
+      const payload: unknown = await response.json().catch(() => null);
+      const responseObject = typeof payload === "object" && payload !== null
+        ? payload as { data?: unknown; error?: { message?: unknown } }
+        : {};
+      const dataObject = typeof responseObject.data === "object" && responseObject.data !== null
+        ? responseObject.data as { id?: unknown; deleted?: unknown }
+        : undefined;
+      const id = typeof dataObject?.id === "string" ? dataObject.id : undefined;
       if (id) createdIds.add(id);
       const ok = method === "POST"
         ? response.status() === 201 && Boolean(id)
         : method === "GET"
-          ? response.status() === 200 && Array.isArray(payload?.data)
-          : response.status() === 200 && payload?.data?.deleted === true;
+          ? response.status() === 200 && Array.isArray(responseObject.data)
+          : response.status() === 200 && dataObject?.deleted === true;
       return {
         status: response.status(),
         ms: performance.now() - started,
         ok,
         id,
-        ...(!ok ? { error: String(payload?.error?.message || "Unexpected response payload").slice(0, 200) } : {}),
+        ...(!ok ? { error: String(responseObject.error?.message || "Unexpected response payload").slice(0, 200) } : {}),
       };
     } catch (error) {
       return {
