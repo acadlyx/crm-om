@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const email = process.env.PLATFORM_ADMIN_EMAIL || "admin@example.test";
-const password = process.env.PLATFORM_ADMIN_PASSWORD || "ci-only-password-long-enough";
+const email = process.env.E2E_TENANT_ADMIN_EMAIL || "e2e-owner@example.test";
+const password = process.env.E2E_TENANT_ADMIN_PASSWORD || "ci-e2e-owner-password-long-enough";
 const widths = [320, 375, 390, 768, 1024, 1280, 1440] as const;
 const representativeWidths = [320, 390, 768, 1440] as const;
 
