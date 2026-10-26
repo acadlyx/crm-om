@@ -27,7 +27,10 @@ function createPrisma() {
     adapter: new PrismaPg({
       connectionString: getRuntimeConnectionString(),
       max: 1,
-      connectionTimeoutMillis: 5_000,
+      // This also bounds how long callers wait in pg-pool's checkout queue.
+      // With a deliberately small serverless pool, a 5s cutoff causes burst traffic
+      // to fail while work is queued even though the database is still healthy.
+      connectionTimeoutMillis: 15_000,
       idleTimeoutMillis: 10_000,
     }),
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],

@@ -39,6 +39,8 @@ jobs:
       PLATFORM_ADMIN_EMAIL: admin@example.test
       PLATFORM_ADMIN_PASSWORD: ci-only-password-long-enough
       PLATFORM_ADMIN_NAME: CI Platform Administrator
+      E2E_TENANT_ADMIN_EMAIL: e2e-owner@example.test
+      E2E_TENANT_ADMIN_PASSWORD: ci-e2e-owner-password-long-enough
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

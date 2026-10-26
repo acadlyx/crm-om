@@ -52,6 +52,49 @@ async function main() {
     },
   });
   console.info("Global platform branding settings ensured.");
+
+  // Keep the tenant-scoped browser checks realistic in CI without creating
+  // sample business data in normal environments. These credentials are set
+  // only by the dedicated CI workflow.
+  const e2eEmail = process.env.E2E_TENANT_ADMIN_EMAIL?.trim().toLowerCase();
+  const e2ePassword = process.env.E2E_TENANT_ADMIN_PASSWORD;
+  if (e2eEmail || e2ePassword) {
+    if (!e2eEmail || !e2ePassword || e2ePassword.length < 12) {
+      throw new Error("Both E2E_TENANT_ADMIN_EMAIL and a 12+ character E2E_TENANT_ADMIN_PASSWORD are required together.");
+    }
+
+    const tenant = await prisma.tenant.upsert({
+      where: { slug: "e2e-business-workspace" },
+      update: {},
+      create: { slug: "e2e-business-workspace" },
+    });
+
+    await prisma.businessSettings.upsert({
+      where: { tenantId: tenant.id },
+      update: { businessName: "E2E Business Workspace" },
+      create: { tenantId: tenant.id, businessName: "E2E Business Workspace" },
+    });
+
+    await prisma.user.upsert({
+      where: { email: e2eEmail },
+      update: {
+        name: "E2E Workspace Administrator",
+        role: UserRole.TENANT_ADMIN,
+        passwordHash: await hash(e2ePassword, 12),
+        tenantId: tenant.id,
+        isActive: true,
+      },
+      create: {
+        name: "E2E Workspace Administrator",
+        email: e2eEmail,
+        role: UserRole.TENANT_ADMIN,
+        passwordHash: await hash(e2ePassword, 12),
+        tenantId: tenant.id,
+      },
+    });
+
+    console.info("Dedicated E2E workspace administrator upserted.");
+  }
 }
 main()
   .catch((error) => {

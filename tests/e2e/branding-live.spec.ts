@@ -10,9 +10,9 @@ test("branding update persists and appears on a fresh request without restarting
   expect(initialResponse.ok()).toBeTruthy();
   const initial = (await initialResponse.json()).data;
 
-  await page.goto("/login");
+  await page.goto("/logintoprivatecrmbysyzent7456");
   await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).fill(password);
+  await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: /sign in/i }).click();
   await expect(page).toHaveURL(/\/dashboard(?:$|\?)/);
   await page.goto("/platform-settings/branding");
@@ -32,7 +32,7 @@ test("branding update persists and appears on a fresh request without restarting
   // No process restart or build occurs between the update and this fresh request.
   await page.reload();
   await expect(page).toHaveTitle(new RegExp(changedName));
-  await expect(page.getByText(changedName, { exact: true }).first()).toBeVisible();
+  await expect(page.locator(".sidebar").getByText(changedName, { exact: true })).toBeVisible();
   const persistedResponse = await request.get(apiUrl);
   expect((await persistedResponse.json()).data.productName).toBe(changedName);
 
