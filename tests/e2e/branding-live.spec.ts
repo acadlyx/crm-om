@@ -12,7 +12,7 @@ test("branding update persists and appears on a fresh request without restarting
 
   await page.goto("/logintoprivatecrmbysyzent7456");
   await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).fill(password);
+  await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: /sign in/i }).click();
   await expect(page).toHaveURL(/\/dashboard(?:$|\?)/);
   await page.goto("/platform-settings/branding");
