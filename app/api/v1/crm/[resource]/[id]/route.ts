@@ -266,7 +266,14 @@ export async function DELETE(request: Request, context: { params: Promise<{ reso
         },
       });
       return { kind: "DELETED" as const };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      // Under bursty bulk-delete workloads, queue time to acquire a pool connection can
+      // exceed Prisma's 2s interactive-transaction default. Keep the transaction bounded,
+      // but allow queued tenant-scoped deletes time to start and complete.
+      maxWait: 30_000,
+      timeout: 30_000,
+    });
 
     if (result.kind === "NOT_FOUND") return fail(404, "Record not found in this workspace.");
     if (result.kind === "IN_USE") return fail(409, result.reason);
